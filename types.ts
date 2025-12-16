@@ -1,4 +1,5 @@
 export enum ViewState {
+  AUTH = 'AUTH',
   ONBOARDING = 'ONBOARDING',
   HOME = 'HOME',
   SCANNER = 'SCANNER',

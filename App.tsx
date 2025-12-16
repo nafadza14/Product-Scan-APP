@@ -7,33 +7,82 @@ import Button from './components/Button';
 import Scanner from './components/Scanner';
 import ResultModal from './components/ResultModal';
 import ExploreView from './components/ExploreView';
+import Auth from './components/Auth';
 import { analyzeImage } from './services/geminiService';
+import { supabase } from './services/supabaseClient';
+import { getUserProfile, updateUserProfile, getScanHistory, addScanResult } from './services/dbService';
 
 const App: React.FC = () => {
-  const [view, setView] = useState<ViewState>(ViewState.ONBOARDING);
+  const [view, setView] = useState<ViewState>(ViewState.AUTH);
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [activeTab, setActiveTab] = useState('Home');
   const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([]);
+  const [loadingApp, setLoadingApp] = useState(true);
 
-  // Load User and History
+  // Initialize App and Auth Listener
   useEffect(() => {
-    const savedUser = localStorage.getItem('vitalSense_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-      setView(ViewState.HOME);
-    }
+    const initialize = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        setUserId(session.user.id);
+        const profile = await getUserProfile(session.user.id);
+        
+        if (profile) {
+          setUser(profile);
+          const history = await getScanHistory(session.user.id);
+          setScanHistory(history);
+          setView(ViewState.HOME);
+        } else {
+          setView(ViewState.ONBOARDING);
+        }
+      } else {
+        setView(ViewState.AUTH);
+      }
+      setLoadingApp(false);
+    };
 
-    const savedHistory = localStorage.getItem('vitalSense_history');
-    if (savedHistory) {
-      setScanHistory(JSON.parse(savedHistory));
-    }
+    initialize();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        setUserId(session.user.id);
+        const profile = await getUserProfile(session.user.id);
+        if (profile) {
+          setUser(profile);
+          const history = await getScanHistory(session.user.id);
+          setScanHistory(history);
+          setView(ViewState.HOME);
+        } else {
+          setView(ViewState.ONBOARDING);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setUserId(null);
+        setScanHistory([]);
+        setView(ViewState.AUTH);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const handleOnboardingComplete = (profile: UserProfile) => {
+  const handleOnboardingComplete = async (profile: UserProfile) => {
+    if (!userId) return;
+    
+    // Override name with auth metadata if available, or keep default
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (authUser?.user_metadata?.full_name) {
+       profile.name = authUser.user_metadata.full_name;
+    } else if (authUser?.email) {
+       profile.name = authUser.email.split('@')[0];
+    }
+
+    await updateUserProfile(userId, profile);
     setUser(profile);
-    localStorage.setItem('vitalSense_user', JSON.stringify(profile));
     setView(ViewState.HOME);
   };
 
@@ -42,7 +91,7 @@ const App: React.FC = () => {
     setIsScanning(true);
     setScanResult(null); 
 
-    if (!user) return;
+    if (!user || !userId) return;
 
     const rawBase64 = imageSrc.split(',')[1];
     
@@ -50,22 +99,27 @@ const App: React.FC = () => {
       const result = await analyzeImage(rawBase64, user);
       setScanResult(result);
       
-      // Save to History
+      // Save to History in Supabase
       const newHistoryItem: ScanHistoryItem = {
         ...result,
-        id: Date.now().toString(),
+        id: crypto.randomUUID(),
         timestamp: Date.now()
       };
       
-      const updatedHistory = [newHistoryItem, ...scanHistory];
-      setScanHistory(updatedHistory);
-      localStorage.setItem('vitalSense_history', JSON.stringify(updatedHistory));
+      await addScanResult(userId, newHistoryItem);
+      
+      // Update local state immediately for UI responsiveness
+      setScanHistory(prev => [newHistoryItem, ...prev]);
 
     } catch (e) {
       console.error(e);
     } finally {
       setIsScanning(false);
     }
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
   };
 
   const formatTimeAgo = (timestamp: number): string => {
@@ -95,7 +149,19 @@ const App: React.FC = () => {
     </button>
   );
 
+  if (loadingApp) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-[#6FAE9A] border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   // ---------- RENDER VIEWS ----------
+
+  if (view === ViewState.AUTH) {
+    return <Auth />;
+  }
 
   if (view === ViewState.ONBOARDING) {
     return <Onboarding onComplete={handleOnboardingComplete} />;
@@ -120,10 +186,10 @@ const App: React.FC = () => {
           <div className="flex justify-between items-center mb-8">
             <div>
                <p className="text-gray-500 text-sm font-medium">Good Morning,</p>
-               <h1 className="text-2xl font-bold text-[#1C1C1C]">{user?.name || "Sarah"}</h1>
+               <h1 className="text-2xl font-bold text-[#1C1C1C] capitalize">{user?.name || "User"}</h1>
             </div>
             <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden border-2 border-white shadow-sm">
-               <img src="https://picsum.photos/100/100" alt="Profile" />
+               <img src={`https://ui-avatars.com/api/?name=${user?.name}&background=6FAE9A&color=fff`} alt="Profile" />
             </div>
           </div>
 
@@ -258,10 +324,10 @@ const App: React.FC = () => {
             <h1 className="text-2xl font-bold mb-6">Profile</h1>
             <div className="flex flex-col items-center mb-8">
                <div className="w-24 h-24 rounded-full bg-gray-200 overflow-hidden border-4 border-white shadow-lg mb-3">
-                  <img src="https://picsum.photos/100/100" alt="Profile" className="w-full h-full object-cover" />
+                  <img src={`https://ui-avatars.com/api/?name=${user?.name}&background=6FAE9A&color=fff`} alt="Profile" className="w-full h-full object-cover" />
                </div>
                <h2 className="text-xl font-bold">{user?.name}</h2>
-               <p className="text-gray-500 text-sm">Member since 2024</p>
+               <p className="text-gray-500 text-sm">Health ID: {userId?.slice(0, 8)}...</p>
             </div>
 
             <Card className="mb-4">
@@ -289,12 +355,7 @@ const App: React.FC = () => {
                Update Health Profile
             </Button>
 
-            <Button variant="ghost" fullWidth onClick={() => {
-               localStorage.removeItem('vitalSense_user');
-               localStorage.removeItem('vitalSense_history');
-               setScanHistory([]);
-               setView(ViewState.ONBOARDING);
-            }}>Sign Out</Button>
+            <Button variant="ghost" fullWidth onClick={handleSignOut}>Sign Out</Button>
          </div>
       )}
 
