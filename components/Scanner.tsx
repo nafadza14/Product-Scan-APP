@@ -28,6 +28,16 @@ const Scanner: React.FC<ScannerProps> = ({ onCapture, onClose }) => {
         
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          // Apply flash setting if track supports it
+          const track = stream.getVideoTracks()[0];
+          if (track) {
+             const capabilities = track.getCapabilities?.() as any; // Cast to avoid TS issues if types missing
+             if (capabilities && capabilities.torch) {
+                 track.applyConstraints({
+                    advanced: [{ torch: flashOn }] as any
+                 }).catch(e => console.log("Flash not supported", e));
+             }
+          }
         }
         setHasPermission(true);
       } catch (err) {
@@ -40,27 +50,63 @@ const Scanner: React.FC<ScannerProps> = ({ onCapture, onClose }) => {
 
     return () => {
       if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach(track => {
+            track.stop();
+        });
       }
     };
-  }, []);
+  }, [flashOn]); // Re-run to apply flash if needed, though usually applyConstraints is better on existing track. 
+  
+  // Effect specifically for Flash toggling without restarting stream if possible
+  useEffect(() => {
+     if (videoRef.current && videoRef.current.srcObject) {
+         const stream = videoRef.current.srcObject as MediaStream;
+         const track = stream.getVideoTracks()[0];
+         if (track) {
+             // Type assertion for advanced constraints
+             const constraints = {
+                 advanced: [{ torch: flashOn }]
+             } as any;
+             track.applyConstraints(constraints).catch(e => {
+                 // Ignore errors if torch not supported
+             });
+         }
+     }
+  }, [flashOn]);
 
   const handleCapture = () => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
       
-      // Set canvas dimensions to match video
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      // Ensure video is ready
+      if (video.readyState !== 4) { // HAVE_ENOUGH_DATA
+          console.warn("Video not ready");
+          return;
+      }
+
+      // Resize logic: Max dimension 1024px to save bandwidth/processing time
+      const MAX_DIMENSION = 1024;
+      let width = video.videoWidth;
+      let height = video.videoHeight;
+
+      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+          if (width > height) {
+              height = (height / width) * MAX_DIMENSION;
+              width = MAX_DIMENSION;
+          } else {
+              width = (width / height) * MAX_DIMENSION;
+              height = MAX_DIMENSION;
+          }
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
       
       const context = canvas.getContext('2d');
       if (context) {
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        context.drawImage(video, 0, 0, width, height);
         const imageSrc = canvas.toDataURL('image/jpeg', 0.8);
-        // Remove the data:image/jpeg;base64, prefix for the API usually, 
-        // but our service handles the raw string, we'll strip it there if needed.
-        // For visual feedback we pass the full string.
         onCapture(imageSrc);
       }
     }
@@ -71,8 +117,37 @@ const Scanner: React.FC<ScannerProps> = ({ onCapture, onClose }) => {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
+        // We can also resize uploaded images here if needed
         const base64String = reader.result as string;
-        onCapture(base64String);
+        
+        // Quick resize for upload
+        const img = new Image();
+        img.src = base64String;
+        img.onload = () => {
+             const canvas = document.createElement('canvas');
+             const MAX_DIMENSION = 1024;
+             let width = img.width;
+             let height = img.height;
+
+             if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+                if (width > height) {
+                    height = (height / width) * MAX_DIMENSION;
+                    width = MAX_DIMENSION;
+                } else {
+                    width = (width / height) * MAX_DIMENSION;
+                    height = MAX_DIMENSION;
+                }
+             }
+             canvas.width = width;
+             canvas.height = height;
+             const ctx = canvas.getContext('2d');
+             if (ctx) {
+                 ctx.drawImage(img, 0, 0, width, height);
+                 onCapture(canvas.toDataURL('image/jpeg', 0.8));
+             } else {
+                 onCapture(base64String); // Fallback
+             }
+        };
       };
       reader.readAsDataURL(file);
     }

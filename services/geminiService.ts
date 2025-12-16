@@ -4,6 +4,7 @@ import { ScanResult, UserProfile, ScanStatus, HealthCondition } from "../types";
 const GEMINI_API_KEY = process.env.API_KEY || '';
 
 // Initialize Gemini Client
+// Note: We create the client inside the function call or check key existence to avoid immediate crashes if env is missing
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 export const analyzeImage = async (
@@ -11,6 +12,18 @@ export const analyzeImage = async (
   userProfile: UserProfile
 ): Promise<ScanResult> => {
   
+  if (!GEMINI_API_KEY) {
+      console.error("Gemini API Key is missing. Please check your environment variables.");
+      return {
+        productName: "Configuration Error",
+        icon: "⚠️",
+        status: ScanStatus.CAUTION,
+        explanation: "The AI API Key is missing. If you are the developer, please add the API_KEY environment variable in Vercel settings.",
+        ingredients: [],
+        alternatives: []
+      };
+  }
+
   // Using gemini-2.5-flash for faster and more robust multimodal analysis
   const modelId = "gemini-2.5-flash";
 
@@ -132,13 +145,23 @@ export const analyzeImage = async (
       alternatives: data.alternatives || []
     };
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini Analysis Failed:", error);
+    
+    // Provide a more specific error message in the result if possible
+    let errorMessage = "We couldn't analyze this image. Please ensure the ingredients text is clearly visible and try again.";
+    
+    if (error.message?.includes('403') || error.message?.includes('API_KEY')) {
+        errorMessage = "API Key Error: Please check your API Key configuration.";
+    } else if (error.message?.includes('429')) {
+        errorMessage = "Service is busy. Please try again in a moment.";
+    }
+
     return {
       productName: "Scan Failed",
       icon: "⚠️",
       status: ScanStatus.CAUTION,
-      explanation: "We couldn't analyze this image. Please ensure the ingredients text is clearly visible and try again.",
+      explanation: errorMessage,
       ingredients: [],
       alternatives: []
     };
