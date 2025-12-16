@@ -4,7 +4,6 @@ import { ScanResult, UserProfile, ScanStatus, HealthCondition } from "../types";
 const GEMINI_API_KEY = process.env.API_KEY || '';
 
 // Initialize Gemini Client
-// Note: We create the client inside the function call or check key existence to avoid immediate crashes if env is missing
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 export const analyzeImage = async (
@@ -13,24 +12,22 @@ export const analyzeImage = async (
 ): Promise<ScanResult> => {
   
   if (!GEMINI_API_KEY) {
-      console.error("Gemini API Key is missing. Please check your environment variables.");
+      console.error("Gemini API Key is missing.");
       return {
         productName: "Configuration Error",
         icon: "⚠️",
         status: ScanStatus.CAUTION,
-        explanation: "The AI API Key is missing. If you are the developer, please add the API_KEY environment variable in Vercel settings.",
+        explanation: "API Key missing. Check Vercel Environment Variables.",
         ingredients: [],
         alternatives: []
       };
   }
 
-  // Using gemini-2.5-flash for faster and more robust multimodal analysis
+  // Use gemini-2.5-flash for speed
   const modelId = "gemini-2.5-flash";
 
-  const isGeneralHealth = userProfile.condition === HealthCondition.GENERAL_HEALTH;
   const isCustomCondition = userProfile.condition === HealthCondition.MORE_DISEASES;
 
-  // Construct the primary condition string
   const conditionLabel = isCustomCondition 
     ? `Specific Condition: ${userProfile.customConditionName}` 
     : userProfile.condition;
@@ -43,24 +40,25 @@ export const analyzeImage = async (
     ? userProfile.currentSymptoms.join(', ')
     : "None";
 
+  // Optimized System Instruction for speed (fewer input tokens)
   const systemInstruction = `
-    You are an expert Ingredient Analyst and Nutritionist. Your role is to analyze product labels for safety based on a user's profile.
-    
-    User Profile:
-    - Condition: ${conditionLabel}
-    - Specific Context: ${contextStr}
-    - Current Symptoms: ${symptomsStr}
+    Analyze product label (Food/Skincare) image for safety.
+    User Profile: [Condition: ${conditionLabel}], [Context: ${contextStr}], [Symptoms: ${symptomsStr}].
     
     Task:
-    1. **Identify Product**: Is this Food or Skincare? If neither (e.g. random object), mark as CAUTION and explain.
-    2. **Pick an Icon**: Choose a single emoji that best represents this product (e.g. 🥛 for milk, 🧴 for lotion).
-    3. **Analyze Ingredients**: Check against the user's specific condition and restrictions.
-    4. **Verdict**:
-       - SAFE: No harmful ingredients found for this profile.
-       - CAUTION: Majority of ingredients are safe, but has minor warnings. Use a friendly tone: "It's likely fine to use, but be mindful of..."
-       - AVOID: Contains prohibited ingredients for this condition.
+    1. Identify Product.
+    2. Analyze ingredients against Profile.
+    3. Verdict: SAFE, CAUTION, or AVOID.
     
-    Output strictly in JSON format. Do not include markdown code blocks.
+    Output strictly in JSON:
+    {
+      "productName": "string",
+      "icon": "emoji",
+      "status": "SAFE" | "CAUTION" | "AVOID",
+      "explanation": "Concise verdict (max 2 sentences).",
+      "ingredients": [{ "name": "string", "riskLevel": "Safe" | "Moderate" | "High Risk", "description": "Very short reason" }],
+      "alternatives": [{ "name": "string", "reason": "short reason" }]
+    }
   `;
 
   try {
@@ -75,7 +73,7 @@ export const analyzeImage = async (
             }
           },
           {
-            text: "Analyze this image. Return strictly valid JSON matching the schema."
+            text: "Analyze image. Return valid JSON."
           }
         ]
       },
@@ -92,7 +90,7 @@ export const analyzeImage = async (
           type: Type.OBJECT,
           properties: {
             productName: { type: Type.STRING },
-            icon: { type: Type.STRING, description: "A single emoji representing the product" },
+            icon: { type: Type.STRING },
             status: { type: Type.STRING, enum: ["SAFE", "CAUTION", "AVOID"] },
             explanation: { type: Type.STRING },
             ingredients: {
@@ -123,15 +121,11 @@ export const analyzeImage = async (
     });
 
     const text = response.text;
-    if (!text) {
-      throw new Error("No response from AI");
-    }
+    if (!text) throw new Error("No response from AI");
 
-    // Clean up potential markdown blocks if the model ignores the instruction (rare with JSON mode but possible)
     const cleanText = text.replace(/```json\n?|\n?```/g, "").trim();
     const data = JSON.parse(cleanText);
 
-    // Map the string status to our Enum
     let statusEnum = ScanStatus.SAFE;
     if (data.status === 'AVOID') statusEnum = ScanStatus.AVOID;
     if (data.status === 'CAUTION') statusEnum = ScanStatus.CAUTION;
@@ -148,13 +142,10 @@ export const analyzeImage = async (
   } catch (error: any) {
     console.error("Gemini Analysis Failed:", error);
     
-    // Provide a more specific error message in the result if possible
-    let errorMessage = "We couldn't analyze this image. Please ensure the ingredients text is clearly visible and try again.";
+    let errorMessage = "Could not analyze. Ensure text is clear and try again.";
     
-    if (error.message?.includes('403') || error.message?.includes('API_KEY')) {
-        errorMessage = "API Key Error: Please check your API Key configuration.";
-    } else if (error.message?.includes('429')) {
-        errorMessage = "Service is busy. Please try again in a moment.";
+    if (error.message?.includes('429')) {
+        errorMessage = "Service busy. Please try again.";
     }
 
     return {

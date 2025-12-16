@@ -12,12 +12,12 @@ const Button: React.FC<ButtonProps> = ({
   className = '', 
   ...props 
 }) => {
-  const baseStyles = "h-14 px-6 rounded-2xl font-medium transition-all active:scale-95 flex items-center justify-center";
+  const baseStyles = "h-14 px-8 rounded-full font-bold transition-all active:scale-95 flex items-center justify-center tracking-wide";
   
   const variants = {
-    primary: "bg-[#6FAE9A] text-white shadow-soft hover:bg-[#5D9A88]",
-    secondary: "border-2 border-[#6FAE9A] text-[#6FAE9A] bg-transparent",
-    ghost: "text-[#6FAE9A] bg-transparent hover:bg-gray-50"
+    primary: "bg-gradient-to-r from-[#6FAE9A] to-[#5D9A88] text-white shadow-[0_10px_20px_rgba(111,174,154,0.3)] hover:shadow-[0_15px_25px_rgba(111,174,154,0.4)] hover:translate-y-[-1px]",
+    secondary: "bg-white/80 backdrop-blur-sm border-2 border-[#6FAE9A]/20 text-[#6FAE9A] hover:bg-white",
+    ghost: "text-[#6FAE9A] bg-transparent hover:bg-[#6FAE9A]/10"
   };
 
   const widthClass = fullWidth ? "w-full" : "";

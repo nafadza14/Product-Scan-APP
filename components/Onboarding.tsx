@@ -35,100 +35,28 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     switch (cond) {
       case HealthCondition.ALLERGIES:
         return [
-          "Peanuts", 
-          "Tree Nuts (Almonds, Cashews, etc.)", 
-          "Milk / Dairy / Lactose", 
-          "Eggs", 
-          "Wheat / Gluten", 
-          "Soy", 
-          "Fish", 
-          "Shellfish (Crustacean)", 
-          "Sesame", 
-          "Sulfites",
-          "Corn",
-          "Mustard",
-          "Fragrance / Perfume (Contact Dermatitis)",
-          "Latex"
+          "Peanuts", "Tree Nuts", "Dairy", "Eggs", "Gluten", "Soy", "Shellfish"
         ];
       case HealthCondition.PREGNANCY:
         return [
-          "Trimester: 1st (Weeks 1-12)",
-          "Trimester: 2nd (Weeks 13-26)",
-          "Trimester: 3rd (Weeks 27+)",
-          "Condition: Gestational Diabetes",
-          "Condition: Preeclampsia / High BP",
-          "Symptom: Severe Morning Sickness",
-          "Diet: Avoiding Unpasteurized Dairy",
-          "Diet: Limiting Caffeine",
-          "Diet: Meat/Egg Aversions",
-          "Skincare: Avoid Retinoids/Salicylic Acid",
-          "Skincare: Avoid Essential Oils",
-          "Supplement: Taking Prenatals"
+          "1st Trimester", "2nd Trimester", "3rd Trimester", "Gestational Diabetes", "High BP"
         ];
       case HealthCondition.AUTOIMMUNE:
         return [
-          "Celiac Disease (Strict Gluten-Free)",
-          "Hashimoto's Thyroiditis",
-          "Rheumatoid Arthritis",
-          "Lupus (SLE)",
-          "Psoriasis / Eczema",
-          "Diet: AIP (Autoimmune Protocol)",
-          "Sensitivity: Nightshades (Tomatoes, Peppers)",
-          "Sensitivity: Dairy / Casein",
-          "Sensitivity: Soy",
-          "Sensitivity: Legumes / Grains",
-          "Trigger: Artificial Sweeteners",
-          "Symptom: Chronic Inflammation / Joint Pain"
+          "Celiac Disease", "Hashimoto's", "Rheumatoid Arthritis", "Lupus", "AIP Diet"
         ];
       case HealthCondition.CANCER_CARE:
         return [
-          "Treatment: Chemotherapy",
-          "Treatment: Radiation Therapy",
-          "Treatment: Immunotherapy",
-          "Condition: Neutropenic (Low Immunity)",
-          "Symptom: Mouth Sores / Swallowing Issues",
-          "Symptom: Metallic Taste / Dysgeusia",
-          "Symptom: Severe Nausea / Vomiting",
-          "Diet: Need High-Calorie / High-Protein",
-          "Skin: Radiation Burns / Extreme Dryness",
-          "Skincare: Need Fragrance-Free",
-          "Risk: Lymphedema",
-          "Symptom: Extreme Fatigue"
+          "Chemotherapy", "Radiation", "Neutropenic", "Mouth Sores", "Nausea"
         ];
       case HealthCondition.GENERAL_HEALTH:
         return [
-          "Goal: Weight Loss",
-          "Goal: Muscle Gain",
-          "Diet: Vegan",
-          "Diet: Vegetarian",
-          "Diet: Keto / Low Carb",
-          "Watch: Added Sugars",
-          "Watch: Sodium / Salt (Heart Health)",
-          "Watch: Saturated Fats",
-          "Avoid: Processed Foods / Additives",
-          "Skin: Acne-Prone",
-          "Skin: Sensitive / Dry",
-          "Skincare: Avoid Parabens / Sulfates"
+          "Weight Loss", "Muscle Gain", "Vegan", "Keto", "Low Sodium", "Acne-Prone Skin"
         ];
       default:
         return [];
     }
   };
-
-  const getCommonRestrictions = () => [
-    "Low Sodium",
-    "Low Potassium",
-    "Low Phosphorus",
-    "Low Protein",
-    "Fluid Restriction",
-    "Gluten Free",
-    "Low Sugar / Diabetic Friendly",
-    "Low FODMAP",
-    "Anti-Inflammatory",
-    "Avoid Grapefruit (Meds Interaction)",
-    "Soft Foods Only",
-    "Fragrance Free"
-  ];
 
   const handleNext = () => {
     if (step === 1 && condition) {
@@ -136,12 +64,10 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     } else if (step === 2) {
       setStep(3);
     } else if (step === 3) {
-      // Compile final context
       let finalContext = [...selectedContext];
       if (condition === HealthCondition.MORE_DISEASES && customDesc) {
         finalContext.push(`Description: ${customDesc}`);
       }
-
       onComplete({
         name: "User",
         condition: condition!,
@@ -165,40 +91,42 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   };
 
   return (
-    <div className="min-h-screen bg-white p-6 flex flex-col pt-12">
+    <div className="min-h-screen p-6 flex flex-col pt-12 relative overflow-hidden">
+       {/* Decorative Background */}
+       <div className="absolute top-0 right-0 w-64 h-64 bg-[#6FAE9A]/10 rounded-full blur-[80px] -mr-32 -mt-32"></div>
+
       {/* Progress Bar */}
-      <div className="w-full h-1 bg-gray-100 rounded-full mb-8 overflow-hidden">
+      <div className="w-full h-2 bg-white/50 rounded-full mb-10 overflow-hidden backdrop-blur-sm border border-white/20">
         <div 
-          className="h-full bg-[#6FAE9A] transition-all duration-500 ease-out" 
+          className="h-full bg-gradient-to-r from-[#6FAE9A] to-[#4D8C7A] transition-all duration-700 ease-out rounded-full shadow-[0_0_10px_#6FAE9A]" 
           style={{ width: `${(step / 3) * 100}%` }}
         ></div>
       </div>
 
-      <div className="flex-1 overflow-y-auto no-scrollbar pb-24">
+      <div className="flex-1 overflow-y-auto no-scrollbar pb-24 relative z-10">
         
         {/* STEP 1: Condition Selection */}
         {step === 1 && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h1 className="text-3xl font-bold text-[#1C1C1C] mb-2">Let's personalize your safety.</h1>
-            <p className="text-gray-500 mb-8">Choose the context that fits you best.</p>
+          <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+            <h1 className="text-4xl font-extrabold text-[#1C1C1C] mb-3 tracking-tight">Personalize<br/>Your Safety.</h1>
+            <p className="text-gray-500 mb-10 font-medium text-lg">Choose the context that fits you best.</p>
             
             <div className="grid grid-cols-2 gap-4">
               {conditions.map((c) => (
-                <div 
+                <Card 
                   key={c.id}
+                  variant={condition === c.id ? "highlight" : "glass"}
                   onClick={() => setCondition(c.id)}
                   className={`
-                    p-6 rounded-2xl border-2 cursor-pointer transition-all duration-200 flex flex-col items-center gap-3 text-center
-                    ${condition === c.id 
-                      ? 'border-[#6FAE9A] bg-[#EAF4F0] text-[#4D8C7A]' 
-                      : 'border-transparent bg-gray-50 text-gray-400 hover:bg-gray-100'}
+                    flex flex-col items-center gap-4 text-center py-8 transition-all duration-300
+                    ${condition === c.id ? 'ring-2 ring-[#6FAE9A] scale-[1.02]' : 'hover:bg-white/90'}
                   `}
                 >
-                  <div className={`transform scale-125 ${condition === c.id ? 'text-[#6FAE9A]' : ''}`}>
-                    {c.icon}
+                  <div className={`transform transition-transform duration-300 ${condition === c.id ? 'scale-110 text-[#6FAE9A]' : 'text-gray-400'}`}>
+                    {React.cloneElement(c.icon as React.ReactElement<any>, { size: 32 })}
                   </div>
-                  <span className="font-semibold text-sm">{c.label}</span>
-                </div>
+                  <span className={`font-bold text-sm ${condition === c.id ? 'text-[#1C1C1C]' : 'text-gray-500'}`}>{c.label}</span>
+                </Card>
               ))}
             </div>
           </div>
@@ -206,81 +134,62 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
         {/* STEP 2: Detailed Screening */}
         {step === 2 && condition && (
-          <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-            <h1 className="text-3xl font-bold text-[#1C1C1C] mb-2">Let's get specific.</h1>
-            <p className="text-gray-500 mb-8">Select all statements that apply to your {condition === HealthCondition.MORE_DISEASES ? "condition" : "situation"}.</p>
+          <div className="animate-in fade-in slide-in-from-right-8 duration-700">
+            <h1 className="text-3xl font-extrabold text-[#1C1C1C] mb-2">Let's get specific.</h1>
+            <p className="text-gray-500 mb-8 font-medium">Refine your profile for better accuracy.</p>
 
-            {condition === HealthCondition.MORE_DISEASES ? (
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Condition Name</label>
-                  <input 
-                    type="text"
-                    value={customName}
-                    onChange={(e) => setCustomName(e.target.value)}
-                    placeholder="e.g., Kidney Disease, IBS"
-                    className="w-full p-4 rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#6FAE9A]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Specific Instructions</label>
-                  <textarea 
-                    value={customDesc}
-                    onChange={(e) => setCustomDesc(e.target.value)}
-                    placeholder="Tell us exactly what to look for..."
-                    className="w-full p-4 rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#6FAE9A] h-24 resize-none"
-                  />
-                </div>
-                
-                <p className="text-sm font-bold text-gray-400 uppercase tracking-wider pt-2">Common Restrictions</p>
-                <div className="space-y-3">
-                  {getCommonRestrictions().map((option) => (
-                    <div 
-                      key={option}
-                      onClick={() => toggleContext(option)}
-                      className={`
-                        p-4 rounded-xl border cursor-pointer transition-all flex items-center justify-between
-                        ${selectedContext.includes(option) 
-                          ? 'border-[#6FAE9A] bg-[#EAF4F0] text-[#4D8C7A]' 
-                          : 'border-gray-200 hover:bg-gray-50'}
-                      `}
-                    >
-                      <span className="font-medium text-sm">{option}</span>
-                      {selectedContext.includes(option) && <Check size={18} />}
+            <Card variant="glass" className="mb-6">
+                {condition === HealthCondition.MORE_DISEASES ? (
+                <div className="space-y-6">
+                    <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Condition Name</label>
+                    <input 
+                        type="text"
+                        value={customName}
+                        onChange={(e) => setCustomName(e.target.value)}
+                        placeholder="e.g., Kidney Disease"
+                        className="w-full p-4 rounded-xl bg-white/50 border border-white/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#6FAE9A]"
+                    />
                     </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Select all that apply</p>
-                <div className="space-y-3">
-                  {getScreeningOptions(condition).map((option) => (
-                    <div 
-                      key={option}
-                      onClick={() => toggleContext(option)}
-                      className={`
-                        p-4 rounded-xl border cursor-pointer transition-all flex items-center justify-between
-                        ${selectedContext.includes(option) 
-                          ? 'border-[#6FAE9A] bg-[#EAF4F0] text-[#4D8C7A]' 
-                          : 'border-gray-200 hover:bg-gray-50'}
-                      `}
-                    >
-                      <span className="font-medium text-sm">{option}</span>
-                      {selectedContext.includes(option) && <Check size={18} />}
+                    <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Specific Instructions</label>
+                    <textarea 
+                        value={customDesc}
+                        onChange={(e) => setCustomDesc(e.target.value)}
+                        placeholder="Tell us what to look for..."
+                        className="w-full p-4 rounded-xl bg-white/50 border border-white/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#6FAE9A] h-24 resize-none"
+                    />
                     </div>
-                  ))}
                 </div>
-              </div>
-            )}
+                ) : (
+                <div className="space-y-3">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Select all that apply</p>
+                    {getScreeningOptions(condition).map((option) => (
+                    <div 
+                        key={option}
+                        onClick={() => toggleContext(option)}
+                        className={`
+                        p-4 rounded-xl border transition-all flex items-center justify-between cursor-pointer
+                        ${selectedContext.includes(option) 
+                            ? 'bg-[#EAF4F0] border-[#6FAE9A] text-[#4D8C7A]' 
+                            : 'bg-white/40 border-transparent hover:bg-white/60'}
+                        `}
+                    >
+                        <span className="font-bold text-sm">{option}</span>
+                        {selectedContext.includes(option) && <Check size={18} className="text-[#6FAE9A]" />}
+                    </div>
+                    ))}
+                </div>
+                )}
+            </Card>
           </div>
         )}
 
         {/* STEP 3: Current Symptoms */}
         {step === 3 && (
-          <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-            <h1 className="text-3xl font-bold text-[#1C1C1C] mb-2">How are you feeling today?</h1>
-            <p className="text-gray-500 mb-8">We'll adjust ingredient risks based on your current state.</p>
+          <div className="animate-in fade-in slide-in-from-right-8 duration-700">
+            <h1 className="text-3xl font-extrabold text-[#1C1C1C] mb-2">How are you feeling?</h1>
+            <p className="text-gray-500 mb-8 font-medium">We'll adjust risks based on your symptoms.</p>
             
             <div className="flex flex-wrap gap-3 mb-8">
               {symptomOptions.map(s => (
@@ -288,30 +197,24 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                   key={s}
                   onClick={() => toggleSymptom(s)}
                   className={`
-                    px-5 py-3 rounded-full text-sm font-medium transition-all
+                    px-6 py-3 rounded-full text-sm font-bold transition-all shadow-sm
                     ${symptoms.includes(s)
-                      ? 'bg-[#6FAE9A] text-white shadow-lg scale-105'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
+                      ? 'bg-[#6FAE9A] text-white shadow-[#6FAE9A]/30 scale-105'
+                      : 'bg-white text-gray-500 hover:bg-gray-50'}
                   `}
                 >
                   {s}
                 </button>
               ))}
             </div>
-            
-            <Card className="bg-blue-50 border-none">
-              <p className="text-sm text-blue-800">
-                <strong>Note:</strong> You can always update your symptoms later from the Home screen.
-              </p>
-            </Card>
           </div>
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-6 bg-white border-t border-gray-100 flex gap-4 max-w-[450px] mx-auto z-20">
+      <div className="fixed bottom-0 left-0 right-0 p-6 glass-nav flex gap-4 max-w-[450px] mx-auto z-20 rounded-t-3xl">
         {step > 1 && (
-          <Button variant="secondary" onClick={handleBack} className="w-14 px-0">
-             <ChevronLeft size={20} />
+          <Button variant="secondary" onClick={handleBack} className="w-14 px-0 rounded-full">
+             <ChevronLeft size={24} />
           </Button>
         )}
         <Button 

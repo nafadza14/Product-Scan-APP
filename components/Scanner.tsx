@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Camera, X, Zap, ZapOff, Image as ImageIcon } from 'lucide-react';
+import { X, Zap, ZapOff, Image as ImageIcon, ScanLine } from 'lucide-react';
 import Button from './Button';
 
 interface ScannerProps {
@@ -12,31 +12,36 @@ const Scanner: React.FC<ScannerProps> = ({ onCapture, onClose }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [flashOn, setFlashOn] = useState(false);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
-    let stream: MediaStream | null = null;
-
     const startCamera = async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
+        // Request higher resolution for better OCR accuracy
+        const stream = await navigator.mediaDevices.getUserMedia({
           video: { 
             facingMode: 'environment',
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
+            width: { min: 1280, ideal: 1920, max: 3840 },
+            height: { min: 720, ideal: 1080, max: 2160 },
           }
         });
         
+        streamRef.current = stream;
+
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          // Apply flash setting if track supports it
+          
+          // Apply Focus Mode if supported
           const track = stream.getVideoTracks()[0];
-          if (track) {
-             const capabilities = track.getCapabilities?.() as any; // Cast to avoid TS issues if types missing
-             if (capabilities && capabilities.torch) {
-                 track.applyConstraints({
-                    advanced: [{ torch: flashOn }] as any
-                 }).catch(e => console.log("Flash not supported", e));
+          const capabilities = (track.getCapabilities && track.getCapabilities()) || {};
+
+          try {
+             // Attempt to force continuous focus
+             if ((capabilities as any).focusMode && (capabilities as any).focusMode.includes('continuous')) {
+                await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] } as any);
              }
+          } catch (e) {
+             console.log("Focus mode not supported on this device.");
           }
         }
         setHasPermission(true);
@@ -49,43 +54,54 @@ const Scanner: React.FC<ScannerProps> = ({ onCapture, onClose }) => {
     startCamera();
 
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => {
-            track.stop();
-        });
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
       }
     };
-  }, [flashOn]); // Re-run to apply flash if needed, though usually applyConstraints is better on existing track. 
+  }, []); 
   
-  // Effect specifically for Flash toggling without restarting stream if possible
+  // Toggle Flash
   useEffect(() => {
-     if (videoRef.current && videoRef.current.srcObject) {
-         const stream = videoRef.current.srcObject as MediaStream;
-         const track = stream.getVideoTracks()[0];
+     if (streamRef.current) {
+         const track = streamRef.current.getVideoTracks()[0];
          if (track) {
-             // Type assertion for advanced constraints
-             const constraints = {
-                 advanced: [{ torch: flashOn }]
-             } as any;
-             track.applyConstraints(constraints).catch(e => {
-                 // Ignore errors if torch not supported
-             });
+             const capabilities = (track.getCapabilities && track.getCapabilities()) || {};
+             if ((capabilities as any).torch) {
+                 track.applyConstraints({
+                     advanced: [{ torch: flashOn }]
+                 } as any).catch(e => console.log("Flash error", e));
+             }
          }
      }
   }, [flashOn]);
+
+  // Tap to Focus (Experimental)
+  const handleTapToFocus = async () => {
+      if (streamRef.current) {
+          const track = streamRef.current.getVideoTracks()[0];
+          const capabilities = (track.getCapabilities && track.getCapabilities()) || {};
+          
+          if ((capabilities as any).focusMode && (capabilities as any).focusMode.includes('continuous')) {
+             try {
+                 // Briefly switch to manual then back to continuous to trigger refocus
+                 await track.applyConstraints({ advanced: [{ focusMode: 'manual', focusDistance: 0.5 }] } as any);
+                 setTimeout(async () => {
+                     await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] } as any);
+                 }, 200);
+             } catch (e) {
+                 // Ignore if not supported
+             }
+          }
+      }
+  };
 
   const handleCapture = () => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
       
-      // Ensure video is ready
-      if (video.readyState !== 4) { // HAVE_ENOUGH_DATA
-          console.warn("Video not ready");
-          return;
-      }
+      if (video.readyState !== 4) return;
 
-      // Resize logic: Max dimension 1024px to save bandwidth/processing time
       const MAX_DIMENSION = 1024;
       let width = video.videoWidth;
       let height = video.videoHeight;
@@ -106,7 +122,7 @@ const Scanner: React.FC<ScannerProps> = ({ onCapture, onClose }) => {
       const context = canvas.getContext('2d');
       if (context) {
         context.drawImage(video, 0, 0, width, height);
-        const imageSrc = canvas.toDataURL('image/jpeg', 0.8);
+        const imageSrc = canvas.toDataURL('image/jpeg', 0.85);
         onCapture(imageSrc);
       }
     }
@@ -117,10 +133,7 @@ const Scanner: React.FC<ScannerProps> = ({ onCapture, onClose }) => {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        // We can also resize uploaded images here if needed
         const base64String = reader.result as string;
-        
-        // Quick resize for upload
         const img = new Image();
         img.src = base64String;
         img.onload = () => {
@@ -143,9 +156,9 @@ const Scanner: React.FC<ScannerProps> = ({ onCapture, onClose }) => {
              const ctx = canvas.getContext('2d');
              if (ctx) {
                  ctx.drawImage(img, 0, 0, width, height);
-                 onCapture(canvas.toDataURL('image/jpeg', 0.8));
+                 onCapture(canvas.toDataURL('image/jpeg', 0.85));
              } else {
-                 onCapture(base64String); // Fallback
+                 onCapture(base64String); 
              }
         };
       };
@@ -156,37 +169,38 @@ const Scanner: React.FC<ScannerProps> = ({ onCapture, onClose }) => {
   if (hasPermission === false) {
     return (
       <div className="fixed inset-0 bg-black text-white flex flex-col items-center justify-center p-6 z-50">
-        <Camera size={48} className="mb-4 text-gray-400" />
         <h2 className="text-xl font-bold mb-2">Camera Access Needed</h2>
-        <p className="text-center text-gray-400 mb-6">VitalSense needs camera access to scan ingredients. Please enable it in your browser settings.</p>
+        <p className="text-center text-gray-400 mb-6">VitalSense needs camera access to scan ingredients.</p>
         <Button onClick={onClose} variant="secondary">Go Back</Button>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black z-50 flex flex-col">
-      {/* Hidden Canvas for capture */}
+    <div className="fixed inset-0 bg-black z-50 flex flex-col animate-in fade-in duration-300">
       <canvas ref={canvasRef} className="hidden" />
 
       {/* Header Controls */}
-      <div className="absolute top-0 left-0 right-0 p-6 pt-12 flex justify-between items-center z-10">
-        <button onClick={onClose} className="bg-black/20 backdrop-blur-md p-3 rounded-full text-white">
+      <div className="absolute top-0 left-0 right-0 p-6 pt-12 flex justify-between items-center z-20">
+        <button onClick={onClose} className="bg-white/10 backdrop-blur-md p-3 rounded-full text-white hover:bg-white/20 transition-all border border-white/10 active:scale-95">
           <X size={24} />
         </button>
-        <div className="px-4 py-1 bg-black/40 backdrop-blur-md rounded-full">
-          <span className="text-white text-xs font-medium tracking-wide">SCAN INGREDIENTS</span>
+        
+        <div className="px-4 py-2 bg-black/30 backdrop-blur-xl rounded-full border border-white/10 shadow-lg flex items-center gap-2">
+          <ScanLine size={14} className="text-[#6FAE9A] animate-pulse" />
+          <span className="text-white text-xs font-bold tracking-widest uppercase">AI Scanner</span>
         </div>
+
         <button 
           onClick={() => setFlashOn(!flashOn)} 
-          className="bg-black/20 backdrop-blur-md p-3 rounded-full text-white"
+          className={`p-3 rounded-full text-white transition-all border active:scale-95 ${flashOn ? 'bg-yellow-400/20 border-yellow-400 text-yellow-400' : 'bg-white/10 backdrop-blur-md border-white/10 hover:bg-white/20'}`}
         >
           {flashOn ? <Zap size={24} fill="currentColor" /> : <ZapOff size={24} />}
         </button>
       </div>
 
       {/* Video Feed */}
-      <div className="flex-1 relative overflow-hidden bg-gray-900">
+      <div className="flex-1 relative overflow-hidden bg-gray-900 rounded-b-[2.5rem]" onClick={handleTapToFocus}>
         <video 
           ref={videoRef}
           autoPlay 
@@ -195,17 +209,24 @@ const Scanner: React.FC<ScannerProps> = ({ onCapture, onClose }) => {
           className="absolute inset-0 w-full h-full object-cover"
         />
         
-        {/* Safe Area Guide / Overlay */}
+        {/* Soft Green Gradient Overlay for Branding */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-[#6FAE9A]/20 pointer-events-none"></div>
+
+        {/* Focus Frame */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-64 h-80 border-2 border-white/50 rounded-3xl relative">
-             <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-[#6FAE9A] -mt-1 -ml-1 rounded-tl-xl"></div>
-             <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-[#6FAE9A] -mt-1 -mr-1 rounded-tr-xl"></div>
-             <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-[#6FAE9A] -mb-1 -ml-1 rounded-bl-xl"></div>
-             <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-[#6FAE9A] -mb-1 -mr-1 rounded-br-xl"></div>
+          <div className="w-72 h-80 rounded-[2rem] relative shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] border border-white/20">
+             {/* Animated Corners */}
+             <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-2xl shadow-[0_0_10px_rgba(255,255,255,0.5)]"></div>
+             <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-2xl shadow-[0_0_10px_rgba(255,255,255,0.5)]"></div>
+             <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-2xl shadow-[0_0_10px_rgba(255,255,255,0.5)]"></div>
+             <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white rounded-br-2xl shadow-[0_0_10px_rgba(255,255,255,0.5)]"></div>
              
-             <div className="absolute -bottom-12 left-0 right-0 text-center">
-                <p className="text-white/80 text-sm font-medium bg-black/30 backdrop-blur-md inline-block px-3 py-1 rounded-lg">
-                   Point at text, not barcode
+             {/* Scanning Line Animation - Green */}
+             <div className="absolute left-4 right-4 h-0.5 bg-[#6FAE9A] shadow-[0_0_25px_#6FAE9A] animate-[float_2s_ease-in-out_infinite] top-1/2 opacity-90"></div>
+
+             <div className="absolute -bottom-16 left-0 right-0 text-center">
+                <p className="text-white/90 text-sm font-semibold bg-black/40 backdrop-blur-md inline-block px-4 py-2 rounded-xl border border-white/10">
+                   Tap screen to focus
                 </p>
              </div>
           </div>
@@ -213,25 +234,26 @@ const Scanner: React.FC<ScannerProps> = ({ onCapture, onClose }) => {
       </div>
 
       {/* Footer Controls */}
-      <div className="h-32 bg-black/40 backdrop-blur-xl absolute bottom-0 left-0 right-0 flex justify-between items-center px-8 pb-4">
+      <div className="h-36 bg-black flex justify-between items-center px-10 pb-6 pt-4 z-20">
          {/* Gallery Picker */}
-         <div className="w-12 h-12">
-            <label className="w-full h-full flex items-center justify-center bg-gray-800 rounded-lg cursor-pointer active:scale-95 transition-transform">
-               <ImageIcon size={20} className="text-white" />
+         <div className="w-14 h-14">
+            <label className="w-full h-full flex items-center justify-center bg-white/10 rounded-2xl cursor-pointer active:scale-95 transition-all hover:bg-white/20 border border-white/10 hover:border-[#6FAE9A]/50">
+               <ImageIcon size={24} className="text-white/80" />
                <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
             </label>
          </div>
 
-         {/* Shutter Button */}
+         {/* Shutter Button - Gradient Ring */}
          <button 
             onClick={handleCapture}
-            className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center relative group active:scale-95 transition-transform"
+            className="w-20 h-20 rounded-full border-4 border-white/20 flex items-center justify-center relative group active:scale-95 transition-transform"
          >
-            <div className="w-16 h-16 bg-[#6FAE9A] rounded-full group-hover:bg-[#5D9A88] transition-colors"></div>
+            <div className="absolute inset-0 rounded-full border-2 border-[#6FAE9A] opacity-80 animate-pulse-soft"></div>
+            <div className="w-16 h-16 bg-white rounded-full group-hover:scale-90 transition-transform shadow-[0_0_30px_rgba(111,174,154,0.6)]"></div>
          </button>
 
          {/* Spacer for balance */}
-         <div className="w-12 h-12"></div>
+         <div className="w-14 h-14"></div>
       </div>
     </div>
   );

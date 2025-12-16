@@ -3,62 +3,99 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#F8F9FA" />
+    <meta name="theme-color" content="#F0FDF9" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
     <title>VitalSense</title>
-    <!-- Keeping Tailwind CDN for simplicity, though moving to PostCSS is recommended for prod -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      /* Custom font setup */
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
       
       body {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        background-color: #e5e5e5;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        background-color: #F0FDF9;
+        /* Richer Mesh Gradient */
+        background-image: 
+            radial-gradient(at 0% 0%, hsla(168, 60%, 85%, 0.8) 0, transparent 55%), 
+            radial-gradient(at 100% 0%, hsla(160, 50%, 90%, 0.8) 0, transparent 50%), 
+            radial-gradient(at 100% 100%, hsla(175, 55%, 92%, 1) 0, transparent 50%),
+            radial-gradient(at 0% 100%, hsla(150, 40%, 94%, 1) 0, transparent 50%);
+        background-attachment: fixed;
+        background-size: cover;
         color: #1C1C1C;
         -webkit-font-smoothing: antialiased;
         display: flex;
         justify-content: center;
         min-height: 100vh;
         margin: 0;
+        overflow-x: hidden;
       }
 
       #root {
         width: 100%;
         max-width: 450px;
-        background-color: #F8F9FA;
         min-height: 100vh;
         position: relative;
-        box-shadow: 0 0 20px rgba(0,0,0,0.1);
+      }
+
+      /* Glassmorphism Utilities */
+      .glass {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 255, 255, 0.6);
       }
       
-      .no-scrollbar::-webkit-scrollbar {
-        display: none;
+      .glass-card {
+        background: rgba(255, 255, 255, 0.65);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        box-shadow: 0 8px 32px rgba(31, 38, 135, 0.05);
       }
-      .no-scrollbar {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
+      
+      .glass-nav {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05), 0 5px 15px rgba(0,0,0,0.02);
       }
+
+      /* Animations */
+      @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+      }
+      
+      @keyframes pulse-soft {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.05); opacity: 0.8; }
+      }
+
+      .animate-float { animation: float 6s ease-in-out infinite; }
+      .animate-pulse-soft { animation: pulse-soft 3s ease-in-out infinite; }
+
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
   <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
-    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.87.3",
+    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
     "vite": "https://esm.sh/vite@^7.3.0",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.561.0"
   }
 }
 </script>
 </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
   </body>
 </html>

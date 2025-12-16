@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ViewState, UserProfile, ScanResult, ScanHistoryItem, ScanStatus } from './types';
 import Onboarding from './components/Onboarding';
-import { Home, Scan, Compass, User, Camera, Clock, Activity, ChevronRight, History } from 'lucide-react';
+import { Home, Scan, Compass, User, Clock, Activity, ChevronRight, History, Sparkles } from 'lucide-react';
 import Card from './components/Card';
 import Button from './components/Button';
 import Scanner from './components/Scanner';
@@ -73,7 +73,7 @@ const App: React.FC = () => {
   const handleOnboardingComplete = async (profile: UserProfile) => {
     if (!userId) return;
     
-    // Override name with auth metadata if available, or keep default
+    // Override name with auth metadata if available
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (authUser?.user_metadata?.full_name) {
        profile.name = authUser.user_metadata.full_name;
@@ -99,7 +99,6 @@ const App: React.FC = () => {
       const result = await analyzeImage(rawBase64, user);
       setScanResult(result);
       
-      // Save to History in Supabase
       const newHistoryItem: ScanHistoryItem = {
         ...result,
         id: crypto.randomUUID(),
@@ -107,8 +106,6 @@ const App: React.FC = () => {
       };
       
       await addScanResult(userId, newHistoryItem);
-      
-      // Update local state immediately for UI responsiveness
       setScanHistory(prev => [newHistoryItem, ...prev]);
 
     } catch (e) {
@@ -126,32 +123,40 @@ const App: React.FC = () => {
     const seconds = Math.floor((Date.now() - timestamp) / 1000);
     if (seconds < 60) return 'Just now';
     const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ago`;
+    if (minutes < 60) return `${minutes}m`;
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
+    if (hours < 24) return `${hours}h`;
     const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+    return `${days}d`;
+  };
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
   };
 
   const getStatusStyles = (status: ScanStatus) => {
     switch (status) {
-      case ScanStatus.SAFE: return "text-green-600 bg-green-50";
-      case ScanStatus.AVOID: return "text-red-600 bg-red-50";
-      case ScanStatus.CAUTION: return "text-yellow-600 bg-yellow-50";
-      default: return "text-gray-600 bg-gray-50";
+      case ScanStatus.SAFE: return "text-green-600 bg-green-50 border-green-100";
+      case ScanStatus.AVOID: return "text-red-600 bg-red-50 border-red-100";
+      case ScanStatus.CAUTION: return "text-yellow-600 bg-yellow-50 border-yellow-100";
+      default: return "text-gray-600 bg-gray-50 border-gray-100";
     }
   };
 
   const NavIcon = ({ icon: Icon, label, isActive, onClick }: any) => (
-    <button onClick={onClick} className={`flex flex-col items-center gap-1 ${isActive ? 'text-[#6FAE9A]' : 'text-gray-400'}`}>
-      <Icon size={24} strokeWidth={isActive ? 2.5 : 2} />
-      <span className="text-[10px] font-medium">{label}</span>
+    <button onClick={onClick} className={`relative flex flex-col items-center gap-1 transition-all duration-300 w-12 ${isActive ? 'text-[#6FAE9A] -translate-y-1' : 'text-gray-400 group hover:text-gray-600'}`}>
+      <div className={`p-2 rounded-full transition-all ${isActive ? 'bg-[#6FAE9A]/10' : 'bg-transparent'}`}>
+        <Icon size={22} strokeWidth={isActive ? 2.5 : 2} className={isActive ? "drop-shadow-sm" : ""} />
+      </div>
     </button>
   );
 
   if (loadingApp) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-[#6FAE9A] border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
@@ -177,88 +182,103 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] pb-24 relative overflow-hidden">
+    <div className="min-h-screen pb-32 relative overflow-hidden bg-[#F0FDF9]">
       
       {/* --- HOME VIEW --- */}
       {activeTab === 'Home' && (
-        <div className="p-6 pt-12 animate-in fade-in duration-500">
-          {/* Header */}
-          <div className="flex justify-between items-center mb-8">
-            <div>
-               <p className="text-gray-500 text-sm font-medium">Good Morning,</p>
-               <h1 className="text-2xl font-bold text-[#1C1C1C] capitalize">{user?.name || "User"}</h1>
-            </div>
-            <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden border-2 border-white shadow-sm">
-               <img src={`https://ui-avatars.com/api/?name=${user?.name}&background=6FAE9A&color=fff`} alt="Profile" />
-            </div>
-          </div>
-
-          {/* Daily Insight Hero */}
-          <Card variant="standard" className="bg-gradient-to-br from-[#6FAE9A] to-[#4D8C7A] text-white p-6 mb-6 shadow-[0_8px_30px_rgba(111,174,154,0.4)] border-none">
-            <h2 className="text-lg font-bold mb-2">How is your body feeling?</h2>
-            <p className="text-white/80 text-sm mb-6">Update your symptoms for accurate scanning.</p>
-            
-            <div className="flex justify-between gap-2">
-               {['Nausea', 'Fatigue', 'Great'].map(sym => (
-                  <button 
-                    key={sym}
-                    className="flex-1 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg text-xs font-semibold transition-colors"
-                  >
-                    {sym}
-                  </button>
-               ))}
-            </div>
-          </Card>
-
-          {/* Scan Ingredients CTA Button */}
-          <div 
-             onClick={() => setView(ViewState.SCANNER)}
-             className="w-full bg-white rounded-3xl p-4 shadow-[0_4px_20px_rgba(0,0,0,0.05)] mb-6 flex items-center gap-4 cursor-pointer active:scale-98 transition-transform border border-gray-50"
-          >
-             <div className="w-14 h-14 rounded-2xl bg-[#EAF4F0] flex items-center justify-center text-[#6FAE9A]">
-                <Camera size={28} />
+        <div className="flex flex-col h-screen max-h-screen animate-in fade-in duration-500">
+          
+          <div className="p-6 pt-12 flex-1 overflow-y-auto no-scrollbar pb-32">
+             
+             {/* Header Info */}
+             <div className="flex justify-between items-start mb-6">
+               <div>
+                  <h1 className="text-3xl font-bold text-[#1C1C1C] tracking-tight">{getGreeting()},</h1>
+                  {/* Gradient Text for Name */}
+                  <p className="font-extrabold text-2xl text-transparent bg-clip-text bg-gradient-to-r from-[#6FAE9A] to-[#3B6E5F] truncate max-w-[200px]">
+                    {user?.name?.split(' ')[0]}
+                  </p>
+               </div>
+               <div className="w-12 h-12 rounded-full bg-white/50 backdrop-blur-md border-2 border-white p-0.5 shadow-md overflow-hidden cursor-pointer active:scale-95 transition-transform" onClick={() => setActiveTab('Profile')}>
+                  <img src={`https://ui-avatars.com/api/?name=${user?.name}&background=6FAE9A&color=fff`} alt="Profile" className="w-full h-full object-cover rounded-full" />
+               </div>
              </div>
-             <div className="flex-1">
-                <h3 className="text-lg font-bold text-[#1C1C1C]">Scan ingredients</h3>
-                <p className="text-sm text-gray-500">Point camera at any label</p>
-             </div>
-             <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                <Scan size={16} className="text-gray-400" />
-             </div>
-          </div>
 
-          {/* Recent Activity */}
-          <div className="mb-6">
-            <div className="flex justify-between items-center mb-4">
-               <h3 className="font-bold text-[#1C1C1C]">Recently Scanned</h3>
-               <button className="text-xs text-[#6FAE9A] font-semibold" onClick={() => setActiveTab('MyScan')}>View All</button>
-            </div>
-            
-            <div className="space-y-3">
-               {scanHistory.length === 0 ? (
-                  <div className="text-center py-8 bg-white rounded-xl border border-dashed border-gray-200">
-                     <History className="mx-auto text-gray-300 mb-2" size={24} />
-                     <p className="text-sm text-gray-400">No scans yet. Try scanning something!</p>
-                  </div>
-               ) : (
-                 scanHistory.slice(0, 3).map((item) => (
-                   <div key={item.id} className="flex items-center justify-between p-4 bg-white rounded-xl shadow-sm cursor-pointer" onClick={() => setScanResult(item)}>
-                      <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-lg">
-                            {item.icon || "📦"}
-                         </div>
-                         <div>
-                            <p className="font-semibold text-sm text-gray-800 line-clamp-1">{item.productName}</p>
-                            <p className="text-xs text-gray-400">{formatTimeAgo(item.timestamp)}</p>
-                         </div>
-                      </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusStyles(item.status)}`}>
-                         {item.status.toUpperCase()}
-                      </span>
-                   </div>
-                 ))
-               )}
-            </div>
+             {/* Condition Check-in Card (Highlighted) */}
+             <Card variant="highlight" className="mb-6 p-5 relative overflow-hidden group cursor-pointer border-[#6FAE9A]/20" onClick={() => setView(ViewState.ONBOARDING)}>
+                <div className="absolute top-0 right-0 w-32 h-32 bg-[#6FAE9A]/15 rounded-full blur-2xl -mr-10 -mt-10 group-hover:bg-[#6FAE9A]/25 transition-colors"></div>
+                <div className="relative z-10">
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="p-1 rounded-md bg-[#6FAE9A]/10">
+                           <Sparkles size={14} className="text-[#6FAE9A]" />
+                        </div>
+                        <span className="text-xs font-bold text-[#6FAE9A] uppercase tracking-wider">Daily Check-in</span>
+                    </div>
+                    <h3 className="font-bold text-xl text-[#1C1C1C] mb-1">How is your condition today?</h3>
+                    <p className="text-sm text-gray-500 mb-3 font-medium">Update symptoms for accurate results.</p>
+                    <div className="flex items-center gap-1 text-[#6FAE9A] font-bold text-sm group-hover:gap-2 transition-all">
+                        <span>Update Status</span>
+                        <ChevronRight size={16} />
+                    </div>
+                </div>
+             </Card>
+
+             {/* Scan Action Card - Stronger Gradient */}
+             <div className="mb-8" onClick={() => setView(ViewState.SCANNER)}>
+                <Card variant="standard" className="p-2 flex items-center gap-4 cursor-pointer !border-none !shadow-[0_10px_30px_rgba(111,174,154,0.15)] group active:scale-[0.98]">
+                    <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-[#6FAE9A] to-[#428070] flex items-center justify-center text-white shadow-lg shadow-[#6FAE9A]/30 group-hover:shadow-[#6FAE9A]/50 transition-all">
+                        <Scan size={36} className="group-hover:scale-110 transition-transform drop-shadow-md" />
+                    </div>
+                    <div className="flex-1 py-2 pr-4">
+                        <h3 className="font-bold text-lg text-[#1C1C1C] mb-1">Scan Product</h3>
+                        <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                            Point camera at any label <br/>
+                            <span className="text-[#6FAE9A] font-bold tracking-wide">(Food or Skincare)</span>
+                        </p>
+                    </div>
+                    <div className="pr-4 text-gray-300 group-hover:text-[#6FAE9A] transition-colors">
+                        <ChevronRight size={24} />
+                    </div>
+                </Card>
+             </div>
+
+             {/* Recent Scans List */}
+             <div>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-bold text-[#1C1C1C] text-lg">Recent Scans</h3>
+                    <button className="text-xs text-[#6FAE9A] font-bold uppercase tracking-wide hover:bg-[#6FAE9A]/10 px-2 py-1 rounded-md transition-colors" onClick={() => setActiveTab('MyScan')}>View All</button>
+                </div>
+
+                <div className="space-y-3">
+                    {scanHistory.length === 0 ? (
+                        <div className="text-center py-10 bg-white/40 rounded-3xl border border-white/50 border-dashed">
+                            <p className="text-sm text-gray-400 font-medium">No scans yet. Try scanning an item!</p>
+                        </div>
+                    ) : (
+                        scanHistory.slice(0, 5).map((item) => (
+                        <div 
+                            key={item.id} 
+                            onClick={() => setScanResult(item)}
+                            className="flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm border border-gray-50 cursor-pointer active:scale-[0.99] transition-transform hover:shadow-md hover:border-[#6FAE9A]/20"
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#F0FDF9] to-white border border-[#F0FDF9] flex items-center justify-center text-2xl shadow-sm">
+                                    {item.icon || "📦"}
+                                </div>
+                                <div>
+                                    <p className="font-bold text-gray-800 line-clamp-1">{item.productName}</p>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">{formatTimeAgo(item.timestamp)}</p>
+                                </div>
+                            </div>
+                            <span className={`w-3 h-3 rounded-full shadow-sm ring-2 ring-white ${
+                                item.status === ScanStatus.SAFE ? 'bg-green-500' :
+                                item.status === ScanStatus.AVOID ? 'bg-red-500' : 'bg-yellow-500'
+                            }`}></span>
+                        </div>
+                        ))
+                    )}
+                </div>
+             </div>
           </div>
         </div>
       )}
@@ -271,45 +291,28 @@ const App: React.FC = () => {
       {/* --- MY SCAN VIEW --- */}
       {activeTab === 'MyScan' && (
          <div className="p-6 pt-12 animate-in fade-in duration-500 min-h-screen">
-            <h1 className="text-2xl font-bold mb-6 text-[#1C1C1C]">My Scans</h1>
+            <h1 className="text-3xl font-extrabold mb-6 text-[#1C1C1C]">History</h1>
 
-            {/* Body/Face Scan Card */}
-            <div 
-               onClick={() => setView(ViewState.SCANNER)}
-               className="w-full bg-gradient-to-r from-[#eef2ff] to-[#e0e7ff] rounded-3xl p-5 mb-8 shadow-sm flex items-center gap-4 cursor-pointer active:scale-98 transition-transform border border-indigo-100"
-            >
-               <div className="w-14 h-14 rounded-2xl bg-white text-indigo-500 flex items-center justify-center shadow-sm">
-                  <Activity size={28} />
-               </div>
-               <div className="flex-1">
-                  <h3 className="text-lg font-bold text-indigo-900">Body & Face Scan</h3>
-                  <p className="text-sm text-indigo-700/80">Analyze skin conditions or symptoms</p>
-               </div>
-               <ChevronRight className="text-indigo-300" />
-            </div>
-
-            {/* History List */}
-            <h3 className="font-bold text-[#1C1C1C] mb-4">History Scan</h3>
             <div className="space-y-3 pb-24">
                {scanHistory.length === 0 ? (
-                  <div className="text-center py-12">
-                     <p className="text-gray-400">Your history is empty.</p>
-                     <Button variant="ghost" onClick={() => setView(ViewState.SCANNER)}>Scan a Product</Button>
+                  <div className="flex flex-col items-center justify-center py-20 opacity-50">
+                     <History size={48} className="mb-4" />
+                     <p className="text-gray-500 font-medium">No history yet.</p>
                   </div>
                ) : (
                   scanHistory.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-4 bg-white rounded-xl shadow-sm border border-gray-50 cursor-pointer active:bg-gray-50 transition-colors" onClick={() => setScanResult(item)}>
-                       <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-lg">
+                    <div key={item.id} className="flex items-center justify-between p-4 bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setScanResult(item)}>
+                       <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-2xl">
                              {item.icon || "📦"}
                           </div>
                           <div>
-                             <p className="font-semibold text-sm text-gray-800 line-clamp-1">{item.productName}</p>
-                             <p className="text-xs text-gray-400">{formatTimeAgo(item.timestamp)}</p>
+                             <p className="font-bold text-gray-800 line-clamp-1">{item.productName}</p>
+                             <p className="text-xs text-gray-400 font-medium">{formatTimeAgo(item.timestamp)}</p>
                           </div>
                        </div>
-                       <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusStyles(item.status)}`}>
-                          {item.status.toUpperCase()}
+                       <span className={`px-3 py-1 rounded-full text-[10px] font-bold border ${getStatusStyles(item.status)}`}>
+                          {item.status}
                        </span>
                     </div>
                   ))
@@ -321,41 +324,49 @@ const App: React.FC = () => {
       {/* --- PROFILE VIEW --- */}
       {activeTab === 'Profile' && (
          <div className="p-6 pt-12 animate-in fade-in duration-500">
-            <h1 className="text-2xl font-bold mb-6">Profile</h1>
-            <div className="flex flex-col items-center mb-8">
-               <div className="w-24 h-24 rounded-full bg-gray-200 overflow-hidden border-4 border-white shadow-lg mb-3">
-                  <img src={`https://ui-avatars.com/api/?name=${user?.name}&background=6FAE9A&color=fff`} alt="Profile" className="w-full h-full object-cover" />
+            <h1 className="text-3xl font-extrabold mb-8 text-center text-[#1C1C1C]">Profile</h1>
+            <div className="flex flex-col items-center mb-10">
+               <div className="w-28 h-28 rounded-full p-1 bg-gradient-to-br from-[#6FAE9A] to-[#4D8C7A] mb-4 shadow-xl shadow-[#6FAE9A]/20">
+                  <div className="w-full h-full rounded-full border-4 border-white overflow-hidden bg-white">
+                    <img src={`https://ui-avatars.com/api/?name=${user?.name}&background=6FAE9A&color=fff`} alt="Profile" className="w-full h-full object-cover" />
+                  </div>
                </div>
-               <h2 className="text-xl font-bold">{user?.name}</h2>
-               <p className="text-gray-500 text-sm">Health ID: {userId?.slice(0, 8)}...</p>
+               <h2 className="text-2xl font-bold">{user?.name}</h2>
+               <div className="flex items-center gap-2 mt-2 px-3 py-1 bg-green-50 rounded-full border border-green-100">
+                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                 <p className="text-green-700 text-xs font-bold uppercase tracking-wide">Active</p>
+               </div>
             </div>
 
-            <Card className="mb-4">
-               <div className="flex justify-between items-center mb-2">
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Health Condition</p>
+            <Card variant="highlight" className="mb-6 shadow-md border-white">
+               <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
+                  <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Condition</p>
+                  <Activity size={16} className="text-[#6FAE9A]" />
                </div>
-               <p className="font-medium text-lg text-[#6FAE9A] mb-1">
+               <p className="font-bold text-xl text-[#1C1C1C] mb-2">
                   {user?.customConditionName || user?.condition}
                </p>
                {user?.additionalContext?.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
+                  <div className="flex flex-wrap gap-2">
                      {user.additionalContext.map((ctx, i) => (
-                        <span key={i} className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600 max-w-full truncate">{ctx}</span>
+                        <span key={i} className="text-xs bg-white text-[#6FAE9A] px-2 py-1 rounded-md font-semibold border border-[#6FAE9A]/10 shadow-sm max-w-full truncate">{ctx}</span>
                      ))}
                   </div>
                )}
             </Card>
 
-            <Button 
-               variant="primary" 
-               fullWidth 
-               className="mb-4"
-               onClick={() => setView(ViewState.ONBOARDING)}
-            >
-               Update Health Profile
-            </Button>
+            <div className="space-y-3">
+                <Button 
+                variant="secondary" 
+                fullWidth 
+                onClick={() => setView(ViewState.ONBOARDING)}
+                className="bg-white"
+                >
+                Edit Health Profile
+                </Button>
 
-            <Button variant="ghost" fullWidth onClick={handleSignOut}>Sign Out</Button>
+                <Button variant="ghost" fullWidth onClick={handleSignOut}>Sign Out</Button>
+            </div>
          </div>
       )}
 
@@ -371,22 +382,35 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* --- BOTTOM NAVIGATION --- */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-6 py-4 pb-8 flex justify-between items-center z-30 rounded-t-3xl shadow-[0_-5px_20px_rgba(0,0,0,0.03)] max-w-[450px] mx-auto">
-        <NavIcon icon={Home} label="Home" isActive={activeTab === 'Home'} onClick={() => setActiveTab('Home')} />
-        <NavIcon icon={Compass} label="Explore" isActive={activeTab === 'Explore'} onClick={() => setActiveTab('Explore')} />
-        
-        {/* FAB for Scan */}
-        <button 
-          onClick={() => setView(ViewState.SCANNER)}
-          className="w-16 h-16 -mt-8 bg-[#6FAE9A] rounded-full shadow-[0_8px_20px_rgba(111,174,154,0.4)] flex items-center justify-center text-white transition-transform active:scale-95 border-4 border-[#F8F9FA]"
-        >
-          <Scan size={28} />
-        </button>
-        
-        <NavIcon icon={Clock} label="My Scan" isActive={activeTab === 'MyScan'} onClick={() => setActiveTab('MyScan')} />
-        <NavIcon icon={User} label="Profile" isActive={activeTab === 'Profile'} onClick={() => setActiveTab('Profile')} />
+      {/* --- FLOATING NAVIGATION --- */}
+      <div className="fixed bottom-6 left-6 right-6 z-30 max-w-[400px] mx-auto">
+         {/* Floating Scan Button (Center - GREEN MATCHING) */}
+         <div className="absolute left-1/2 -translate-x-1/2 -top-6 z-40">
+            <button 
+              onClick={() => setView(ViewState.SCANNER)}
+              className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#6FAE9A] to-[#4D8C7A] text-white shadow-[0_10px_30px_rgba(111,174,154,0.5)] flex items-center justify-center border-4 border-[#F0FDF9] active:scale-95 transition-all hover:shadow-[0_15px_40px_rgba(111,174,154,0.6)] hover:-translate-y-1"
+            >
+              <Scan size={28} className="drop-shadow-md" />
+            </button>
+         </div>
+
+         {/* Nav Container */}
+         <div className="glass-nav px-2 py-4 flex justify-between items-center rounded-2xl relative z-30 border border-white/60">
+            <div className="flex-1 flex justify-around">
+               <NavIcon icon={Home} label="Home" isActive={activeTab === 'Home'} onClick={() => setActiveTab('Home')} />
+               <NavIcon icon={Compass} label="Explore" isActive={activeTab === 'Explore'} onClick={() => setActiveTab('Explore')} />
+            </div>
+            
+            {/* Spacer for Center Button */}
+            <div className="w-16"></div>
+
+            <div className="flex-1 flex justify-around">
+               <NavIcon icon={History} label="History" isActive={activeTab === 'MyScan'} onClick={() => setActiveTab('MyScan')} />
+               <NavIcon icon={User} label="Profile" isActive={activeTab === 'Profile'} onClick={() => setActiveTab('Profile')} />
+            </div>
+         </div>
       </div>
+
     </div>
   );
 };
