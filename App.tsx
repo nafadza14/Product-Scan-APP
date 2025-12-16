@@ -25,24 +25,36 @@ const App: React.FC = () => {
   // Initialize App and Auth Listener
   useEffect(() => {
     const initialize = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        setUserId(session.user.id);
-        const profile = await getUserProfile(session.user.id);
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
         
-        if (profile) {
-          setUser(profile);
-          const history = await getScanHistory(session.user.id);
-          setScanHistory(history);
-          setView(ViewState.HOME);
-        } else {
-          setView(ViewState.ONBOARDING);
+        if (error) {
+           console.warn("Session check failed:", error.message);
+           setView(ViewState.AUTH);
+           return;
         }
-      } else {
+
+        if (session?.user) {
+          setUserId(session.user.id);
+          const profile = await getUserProfile(session.user.id);
+          
+          if (profile) {
+            setUser(profile);
+            const history = await getScanHistory(session.user.id);
+            setScanHistory(history);
+            setView(ViewState.HOME);
+          } else {
+            setView(ViewState.ONBOARDING);
+          }
+        } else {
+          setView(ViewState.AUTH);
+        }
+      } catch (err) {
+        console.error("Initialization error:", err);
         setView(ViewState.AUTH);
+      } finally {
+        setLoadingApp(false);
       }
-      setLoadingApp(false);
     };
 
     initialize();
