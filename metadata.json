@@ -1,0 +1,7 @@
+{
+  "name": "VitalSense",
+  "description": "A context-aware health scanner for personalized ingredient analysis.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
