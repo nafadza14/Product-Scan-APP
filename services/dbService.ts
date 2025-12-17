@@ -116,9 +116,9 @@ export const getScanHistory = async (userId: string): Promise<ScanHistoryItem[]>
         icon: item.icon,
         status: item.status,
         explanation: item.explanation,
-        ingredients: item.ingredients,
-        alternatives: item.alternatives,
-        // Ensure all detailed analysis fields are mapped
+        ingredients: item.ingredients || [],
+        alternatives: item.alternatives || [],
+        // Ensure all detailed analysis fields are mapped from DB snake_case to app camelCase
         score: item.score || 0,
         nutriScore: item.nutri_score,
         fullIngredientList: item.full_ingredient_list || '',
@@ -126,6 +126,7 @@ export const getScanHistory = async (userId: string): Promise<ScanHistoryItem[]>
         dietarySuitability: item.dietary_suitability || undefined
     }));
   } catch (e) {
+    console.error("Failed to load history", e);
     return [];
   }
 };
@@ -152,6 +153,6 @@ export const addScanResult = async (userId: string, result: ScanHistoryItem) => 
       nutrition_advisor: result.nutritionAdvisor,
       dietary_suitability: result.dietarySuitability
     }).then(({ error }) => {
-       if (error) console.error('Error adding scan:', error);
+       if (error) console.error('Error adding scan to history:', error);
     });
 };

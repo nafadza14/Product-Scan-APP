@@ -267,7 +267,7 @@ const ResultModal: React.FC<ResultModalProps> = ({ result, onClose, isLoading })
                     <div>
                         <span className="font-bold text-lg block leading-none mb-1">
                              {result.status === ScanStatus.SAFE ? 'Recommended' : 
-                              result.status === ScanStatus.CAUTION ? 'Consume with Caution' : 'Not Recommended'}
+                              result.status === ScanStatus.CAUTION ? 'Use with Caution' : 'Not Recommended'}
                         </span>
                         <span className="text-xs opacity-90 font-medium uppercase tracking-wide">
                              {result.status === ScanStatus.SAFE ? 'Safe for your condition' : 
@@ -313,9 +313,11 @@ const ResultModal: React.FC<ResultModalProps> = ({ result, onClose, isLoading })
             {/* 3. Ingredients - ALWAYS SHOW */}
             <div className="mb-8">
                 <div className="flex justify-between items-end mb-4">
-                     <h3 className="text-lg font-bold text-[#1C1C1C]">Ingredients Analysis</h3>
+                     <h3 className="text-lg font-bold text-[#1C1C1C]">
+                         {isCosmetic ? 'Ingredient Risks' : 'Ingredients Analysis'}
+                     </h3>
                      <span className="text-xs font-bold text-[#6FAE9A] bg-[#6FAE9A]/10 px-2 py-1 rounded-md">
-                         {result.ingredients.filter(i => i.riskLevel !== 'Safe').length} Risks Found
+                         {result.ingredients.filter(i => i.riskLevel !== 'Safe').length} Concerns Found
                      </span>
                 </div>
                 
@@ -336,6 +338,7 @@ const ResultModal: React.FC<ResultModalProps> = ({ result, onClose, isLoading })
 
                 {/* Full Text List */}
                 <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Full Ingredient List</p>
                     <p className="text-sm text-gray-600 leading-relaxed font-medium">
                         {result.fullIngredientList || "Ingredient list not detected."}
                     </p>

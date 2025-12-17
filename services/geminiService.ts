@@ -43,7 +43,7 @@ export const analyzeImage = async (
     ? userProfile.currentSymptoms.join(', ')
     : "None";
 
-  // Optimized System Instruction
+  // Optimized System Instruction for Granular Cosmetic Analysis
   const systemInstruction = `
     Analyze product label image.
     Profile: ${conditionLabel}. Context: ${contextStr}. Symptoms: ${symptomsStr}.
@@ -52,18 +52,29 @@ export const analyzeImage = async (
     1. Identify Product Name & Category ('Food' or 'Cosmetic').
     2. Assess safety (SAFE, CAUTION, AVOID) & score (0-100) based on ingredients + profile.
     
-    IF CATEGORY IS 'Food':
+    --- CATEGORY LOGIC ---
+    
+    IF 'Food':
        - Extract Nutrition Advisor (Fat, Sat Fat, Sugar, Salt, Protein).
        - Determine Dietary Suitability (Vegan, Gluten-Free, etc).
-       - Ingredients: List MODERATE/HIGH risks.
+       - Ingredients: List MODERATE/HIGH risks for health.
     
-    IF CATEGORY IS 'Cosmetic' (Skincare, Make-up, Household):
+    IF 'Cosmetic' (Skincare, Make-up, Haircare, Household):
        - SKIP Nutrition Advisor, Dietary Suitability, NutriScore (return null/empty).
-       - Ingredients: Provide VERY DETAILED analysis of risks (irritants, allergens, comedogenic, hormonal).
+       - PERFORM DEEP INGREDIENT SAFETY CHECK:
+         * Endocrine Disruptors (e.g., Parabens, Phthalates, Triclosan) -> HIGH RISK.
+         * Carcinogens (e.g., Formaldehyde releasers, PEGs with contamination risk) -> HIGH RISK.
+         * Allergens (e.g., Fragrance/Parfum, Methylisothiazolinone, Linalool) -> MODERATE/HIGH depending on profile.
+         * Irritants (e.g., SLS/SLES, Drying Alcohols like Denat) -> MODERATE RISK.
+         * Comedogenic (e.g., Isopropyl Myristate, Coconut Oil - for face products) -> MODERATE RISK.
+       - 'ingredients' array MUST list these risky items.
+       - 'description' for each ingredient MUST start with the classification, e.g., "[Endocrine Disruptor] Linked to hormonal imbalance..." or "[Comedogenic] May clog pores...".
+    
+    --- OUTPUT FORMAT ---
     
     Common for BOTH:
-       - 'fullIngredientList': Raw text.
-       - 'ingredients': Structured array of RISKS.
+       - 'fullIngredientList': Transcription of the full ingredient text.
+       - 'ingredients': Structured array of DETECTED RISKS ONLY.
        - 'alternatives': Max 2 healthy/safer swaps.
        - 'icon': Single emoji.
     
