@@ -9,42 +9,67 @@ export const getCachedProfile = (userId: string): UserProfile | null => {
   try {
     const data = localStorage.getItem(`${CACHE_PREFIX}profile_${userId}`);
     return data ? JSON.parse(data) : null;
-  } catch (e) { return null; }
+  } catch (e) { 
+    // If cache is corrupted, clear it
+    localStorage.removeItem(`${CACHE_PREFIX}profile_${userId}`);
+    return null; 
+  }
 };
 
 export const cacheProfile = (userId: string, data: UserProfile) => {
-  localStorage.setItem(`${CACHE_PREFIX}profile_${userId}`, JSON.stringify(data));
+  try {
+    localStorage.setItem(`${CACHE_PREFIX}profile_${userId}`, JSON.stringify(data));
+  } catch (e) {
+    console.warn("Storage quota exceeded, could not cache profile");
+  }
 };
 
 export const getCachedHistory = (userId: string): ScanHistoryItem[] | null => {
   try {
     const data = localStorage.getItem(`${CACHE_PREFIX}history_${userId}`);
     return data ? JSON.parse(data) : null;
-  } catch (e) { return null; }
+  } catch (e) { 
+    localStorage.removeItem(`${CACHE_PREFIX}history_${userId}`);
+    return null; 
+  }
 };
 
 export const cacheHistory = (userId: string, data: ScanHistoryItem[]) => {
-  localStorage.setItem(`${CACHE_PREFIX}history_${userId}`, JSON.stringify(data));
+  try {
+    // PERFORMANCE FIX: Only cache the latest 10 items locally to prevent 
+    // large JSON parsing from blocking the main thread on app open.
+    const limitedData = data.slice(0, 10);
+    localStorage.setItem(`${CACHE_PREFIX}history_${userId}`, JSON.stringify(limitedData));
+  } catch (e) {
+    // If quota exceeded, clear old history to make space
+    console.warn("Storage quota exceeded, clearing history cache");
+    localStorage.removeItem(`${CACHE_PREFIX}history_${userId}`);
+  }
 };
 
 // --- DATABASE INTERACTIONS ---
 
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
 
-  if (error || !data) return null;
+    if (error || !data) return null;
 
-  return {
-    name: data.name,
-    condition: data.condition,
-    customConditionName: data.custom_condition_name,
-    additionalContext: data.additional_context || [],
-    currentSymptoms: data.current_symptoms || []
-  };
+    return {
+      name: data.name,
+      condition: data.condition,
+      customConditionName: data.custom_condition_name,
+      additionalContext: data.additional_context || [],
+      currentSymptoms: data.current_symptoms || []
+    };
+  } catch (e) {
+    console.error("Network error fetching profile", e);
+    return null;
+  }
 };
 
 export const updateUserProfile = async (userId: string, profile: UserProfile) => {
@@ -65,53 +90,56 @@ export const updateUserProfile = async (userId: string, profile: UserProfile) =>
 
   if (error) {
     console.error('Error updating profile:', error);
-    throw error;
+    // Don't throw, allow the UI to continue optimistically
   }
 };
 
 export const getScanHistory = async (userId: string): Promise<ScanHistoryItem[]> => {
-  const { data, error } = await supabase
-    .from('scans')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(50); // PERFORMANCE: Limit to 50 most recent items
+  try {
+    const { data, error } = await supabase
+        .from('scans')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(20); // Reduced limit for faster initial load
 
-  if (error) {
-    console.error('Error fetching history:', error);
+    if (error) {
+        console.error('Error fetching history:', error);
+        return [];
+    }
+
+    return data.map((item: any) => ({
+        id: item.id,
+        timestamp: item.timestamp,
+        productName: item.product_name,
+        category: item.category || 'Food',
+        icon: item.icon,
+        status: item.status,
+        explanation: item.explanation,
+        ingredients: item.ingredients,
+        alternatives: item.alternatives
+    }));
+  } catch (e) {
     return [];
   }
-
-  return data.map((item: any) => ({
-    id: item.id,
-    timestamp: item.timestamp,
-    productName: item.product_name,
-    category: item.category || 'Food', // Default to Food for backward compatibility
-    icon: item.icon,
-    status: item.status,
-    explanation: item.explanation,
-    ingredients: item.ingredients,
-    alternatives: item.alternatives
-  }));
 };
 
 export const addScanResult = async (userId: string, result: ScanHistoryItem) => {
-  const { error } = await supabase
+  // Fire and forget - don't await this in the UI thread
+  supabase
     .from('scans')
     .insert({
       id: result.id,
       user_id: userId,
       product_name: result.productName,
-      category: result.category, // Assuming DB has been updated, or this might be ignored if col doesn't exist depending on config
+      category: result.category,
       icon: result.icon,
       status: result.status,
       explanation: result.explanation,
       ingredients: result.ingredients,
       alternatives: result.alternatives,
       timestamp: result.timestamp
+    }).then(({ error }) => {
+       if (error) console.error('Error adding scan:', error);
     });
-
-  if (error) {
-    console.error('Error adding scan:', error);
-  }
 };

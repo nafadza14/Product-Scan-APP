@@ -41,60 +41,81 @@ const App: React.FC = () => {
   const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([]);
   const [loadingApp, setLoadingApp] = useState(true);
 
-  // Initialize App with "Cache First" Strategy
+  // Initialize App with "Cache First" Strategy and Race Condition
   useEffect(() => {
     let mounted = true;
 
     const initialize = async () => {
       try {
-        // 1. Get Session (Fast local check usually)
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // RACE CONDITION:
+        // If data fetching takes longer than 2500ms, force the app to open.
+        // This prevents the "stuck on loading" screen.
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('timeout'), 2500));
         
-        // If no session, we stay in Guest Mode (Home View)
-        if (error || !session?.user) {
-           if (mounted) {
-               console.log("No active session, starting in Guest Mode");
-               setLoadingApp(false);
-           }
-           return;
-        }
-
-        const currentUserId = session.user.id;
-        if (mounted) setUserId(currentUserId);
-
-        // 2. INSTANT LOAD: Load from Local Cache
-        const cachedUser = getCachedProfile(currentUserId);
-        const cachedHistory = getCachedHistory(currentUserId);
-
-        if (cachedUser && mounted) {
-           console.log("Loaded from cache");
-           setUser(cachedUser);
-           if (cachedHistory) setScanHistory(cachedHistory);
-           // We are already at HOME by default
-           setLoadingApp(false); 
-        }
-
-        // 3. BACKGROUND SYNC: Fetch Fresh Data
-        const freshProfilePromise = getUserProfile(currentUserId);
-        const freshHistoryPromise = getScanHistory(currentUserId);
-
-        const [profile, history] = await Promise.all([freshProfilePromise, freshHistoryPromise]);
-
-        if (mounted) {
-            if (profile) {
-                setUser(profile);
-                cacheProfile(currentUserId, profile); // Update Cache
-            } else if (session.user) {
-                // User exists but no profile? Go to Onboarding
-                setView(ViewState.ONBOARDING);
+        const loadPromise = (async () => {
+             // 1. Get Session (Fast local check)
+            const { data: { session }, error } = await supabase.auth.getSession();
+            
+            if (error || !session?.user) {
+               return 'guest';
             }
 
-            if (history) {
-                setScanHistory(history);
-                cacheHistory(currentUserId, history); // Update Cache
+            const currentUserId = session.user.id;
+            if (mounted) setUserId(currentUserId);
+
+            // 2. Try Cache First (Sync)
+            const cachedUser = getCachedProfile(currentUserId);
+            
+            if (cachedUser && mounted) {
+               setUser(cachedUser);
+               // If we have cache, we can load history from cache too
+               const cachedHistory = getCachedHistory(currentUserId);
+               if (cachedHistory) setScanHistory(cachedHistory);
+               return 'loaded_cache';
+            }
+
+            // 3. If no cache, Fetch Profile (Async)
+            const profile = await getUserProfile(currentUserId);
+            if (mounted && profile) {
+                setUser(profile);
+                cacheProfile(currentUserId, profile);
+            }
+            return 'loaded_fresh';
+        })();
+
+        // Wait for whichever finishes first: Data Load or 2.5s Timer
+        const result = await Promise.race([loadPromise, timeoutPromise]);
+        
+        if (mounted) {
+            if (result === 'timeout') {
+                console.warn("App initialization timed out, forcing render.");
             }
             
+            // Unblock UI immediately
             setLoadingApp(false);
+
+            // 4. Background Data Sync (Non-Blocking)
+            // Even if we timed out or loaded from cache, we try to fetch fresh data now
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+                 if (!user) {
+                     // Retry profile fetch in background if it timed out and we have no user
+                     getUserProfile(session.user.id).then(p => {
+                         if (p && mounted) {
+                             setUser(p);
+                             cacheProfile(session.user.id, p);
+                         }
+                     });
+                 }
+                 
+                 // Fetch history in background (heavier operation)
+                 getScanHistory(session.user.id).then(h => {
+                     if (mounted && h.length > 0) {
+                        setScanHistory(h);
+                        cacheHistory(session.user.id, h);
+                     }
+                 });
+            }
         }
 
       } catch (err) {
@@ -215,6 +236,10 @@ const App: React.FC = () => {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     localStorage.clear(); // Clear cache on sign out
+    setUser(null);
+    setUserId(null);
+    setScanHistory([]);
+    setView(ViewState.HOME);
   };
 
   const formatTimeAgo = (timestamp: number): string => {

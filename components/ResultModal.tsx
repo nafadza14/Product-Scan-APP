@@ -154,7 +154,7 @@ const NutritionPreferenceRow = ({ icon, label, isSuitable }: { icon: React.React
     </div>
 );
 
-const NutritionAdvisorRow = ({ item }: { item: MacroNutrient }) => {
+const NutritionAdvisorRow: React.FC<{ item: MacroNutrient }> = ({ item }) => {
     // Icon mapping
     const getIcon = (name: string) => {
         if (name.includes('Fat')) return <Droplet size={18} />;
