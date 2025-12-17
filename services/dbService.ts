@@ -1,6 +1,34 @@
 import { supabase } from './supabaseClient';
 import { UserProfile, ScanHistoryItem } from '../types';
 
+const CACHE_PREFIX = 'vitalSense_';
+
+// --- CACHING HELPERS ---
+
+export const getCachedProfile = (userId: string): UserProfile | null => {
+  try {
+    const data = localStorage.getItem(`${CACHE_PREFIX}profile_${userId}`);
+    return data ? JSON.parse(data) : null;
+  } catch (e) { return null; }
+};
+
+export const cacheProfile = (userId: string, data: UserProfile) => {
+  localStorage.setItem(`${CACHE_PREFIX}profile_${userId}`, JSON.stringify(data));
+};
+
+export const getCachedHistory = (userId: string): ScanHistoryItem[] | null => {
+  try {
+    const data = localStorage.getItem(`${CACHE_PREFIX}history_${userId}`);
+    return data ? JSON.parse(data) : null;
+  } catch (e) { return null; }
+};
+
+export const cacheHistory = (userId: string, data: ScanHistoryItem[]) => {
+  localStorage.setItem(`${CACHE_PREFIX}history_${userId}`, JSON.stringify(data));
+};
+
+// --- DATABASE INTERACTIONS ---
+
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
   const { data, error } = await supabase
     .from('profiles')
@@ -20,6 +48,9 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
 };
 
 export const updateUserProfile = async (userId: string, profile: UserProfile) => {
+  // Update Cache Immediately (Optimistic)
+  cacheProfile(userId, profile);
+
   const { error } = await supabase
     .from('profiles')
     .upsert({
@@ -43,7 +74,8 @@ export const getScanHistory = async (userId: string): Promise<ScanHistoryItem[]>
     .from('scans')
     .select('*')
     .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(50); // PERFORMANCE: Limit to 50 most recent items
 
   if (error) {
     console.error('Error fetching history:', error);

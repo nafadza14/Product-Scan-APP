@@ -10,7 +10,16 @@ import ExploreView from './components/ExploreView';
 import Auth from './components/Auth';
 import { analyzeImage } from './services/geminiService';
 import { supabase } from './services/supabaseClient';
-import { getUserProfile, updateUserProfile, getScanHistory, addScanResult } from './services/dbService';
+import { 
+  getUserProfile, 
+  updateUserProfile, 
+  getScanHistory, 
+  addScanResult,
+  getCachedProfile,
+  cacheProfile,
+  getCachedHistory,
+  cacheHistory
+} from './services/dbService';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>(ViewState.AUTH);
@@ -22,64 +31,109 @@ const App: React.FC = () => {
   const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([]);
   const [loadingApp, setLoadingApp] = useState(true);
 
-  // Initialize App and Auth Listener
+  // Initialize App with "Cache First" Strategy
   useEffect(() => {
+    let mounted = true;
+
     const initialize = async () => {
       try {
+        // 1. Get Session (Fast local check usually)
         const { data: { session }, error } = await supabase.auth.getSession();
         
-        if (error) {
-           console.warn("Session check failed:", error.message);
-           setView(ViewState.AUTH);
+        if (error || !session?.user) {
+           if (mounted) {
+               setView(ViewState.AUTH);
+               setLoadingApp(false);
+           }
            return;
         }
 
-        if (session?.user) {
-          setUserId(session.user.id);
-          const profile = await getUserProfile(session.user.id);
-          
-          if (profile) {
-            setUser(profile);
-            const history = await getScanHistory(session.user.id);
-            setScanHistory(history);
-            setView(ViewState.HOME);
-          } else {
-            setView(ViewState.ONBOARDING);
-          }
-        } else {
-          setView(ViewState.AUTH);
+        const currentUserId = session.user.id;
+        if (mounted) setUserId(currentUserId);
+
+        // 2. INSTANT LOAD: Load from Local Cache
+        const cachedUser = getCachedProfile(currentUserId);
+        const cachedHistory = getCachedHistory(currentUserId);
+
+        if (cachedUser && mounted) {
+           console.log("Loaded from cache");
+           setUser(cachedUser);
+           if (cachedHistory) setScanHistory(cachedHistory);
+           setView(ViewState.HOME);
+           setLoadingApp(false); // Unblock UI immediately
         }
+
+        // 3. BACKGROUND SYNC: Fetch Fresh Data
+        const freshProfilePromise = getUserProfile(currentUserId);
+        const freshHistoryPromise = getScanHistory(currentUserId);
+
+        const [profile, history] = await Promise.all([freshProfilePromise, freshHistoryPromise]);
+
+        if (mounted) {
+            if (profile) {
+                setUser(profile);
+                cacheProfile(currentUserId, profile); // Update Cache
+                
+                // If we didn't have cache before, now we render home
+                if (!cachedUser) {
+                    setView(ViewState.HOME);
+                    setLoadingApp(false);
+                }
+            } else {
+                // Profile missing in DB (rare edge case or first login)
+                if (!cachedUser) setView(ViewState.ONBOARDING);
+                setLoadingApp(false);
+            }
+
+            if (history) {
+                setScanHistory(history);
+                cacheHistory(currentUserId, history); // Update Cache
+            }
+        }
+
       } catch (err) {
         console.error("Initialization error:", err);
-        setView(ViewState.AUTH);
-      } finally {
-        setLoadingApp(false);
+        if (mounted && loadingApp) {
+             setView(ViewState.AUTH);
+             setLoadingApp(false);
+        }
       }
     };
 
     initialize();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+      
       if (event === 'SIGNED_IN' && session) {
         setUserId(session.user.id);
         const profile = await getUserProfile(session.user.id);
         if (profile) {
           setUser(profile);
-          const history = await getScanHistory(session.user.id);
-          setScanHistory(history);
+          cacheProfile(session.user.id, profile);
           setView(ViewState.HOME);
+          
+          getScanHistory(session.user.id).then(h => {
+             setScanHistory(h);
+             cacheHistory(session.user.id, h);
+          });
         } else {
           setView(ViewState.ONBOARDING);
         }
+        setLoadingApp(false);
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setUserId(null);
         setScanHistory([]);
         setView(ViewState.AUTH);
+        setLoadingApp(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+        mounted = false;
+        subscription.unsubscribe();
+    };
   }, []);
 
   const handleOnboardingComplete = async (profile: UserProfile) => {
@@ -117,8 +171,13 @@ const App: React.FC = () => {
         timestamp: Date.now()
       };
       
-      await addScanResult(userId, newHistoryItem);
-      setScanHistory(prev => [newHistoryItem, ...prev]);
+      // Optimistic update
+      const newHistory = [newHistoryItem, ...scanHistory];
+      setScanHistory(newHistory);
+      cacheHistory(userId, newHistory); // Cache immediately
+      
+      // Background save
+      addScanResult(userId, newHistoryItem);
 
     } catch (e) {
       console.error(e);
@@ -129,6 +188,7 @@ const App: React.FC = () => {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
+    localStorage.clear(); // Clear cache on sign out
   };
 
   const formatTimeAgo = (timestamp: number): string => {
@@ -194,7 +254,8 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen pb-32 relative overflow-hidden bg-[#F0FDF9]">
+    <div className="min-h-screen pb-32 relative overflow-hidden">
+      {/* Background is handled in index.html for performance */}
       
       {/* --- HOME VIEW --- */}
       {activeTab === 'Home' && (

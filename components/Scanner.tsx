@@ -17,12 +17,13 @@ const Scanner: React.FC<ScannerProps> = ({ onCapture, onClose }) => {
   useEffect(() => {
     const startCamera = async () => {
       try {
-        // Request higher resolution for better OCR accuracy
+        // Optimized for speed: Use 'ideal' constraints instead of 'min' to avoid failure on low-end devices
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { 
             facingMode: 'environment',
-            width: { min: 1280, ideal: 1920, max: 3840 },
-            height: { min: 720, ideal: 1080, max: 2160 },
+            // Flexible resolution: prefer 1080p, but accept lower
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
           }
         });
         
@@ -122,7 +123,8 @@ const Scanner: React.FC<ScannerProps> = ({ onCapture, onClose }) => {
       const context = canvas.getContext('2d');
       if (context) {
         context.drawImage(video, 0, 0, width, height);
-        const imageSrc = canvas.toDataURL('image/jpeg', 0.85);
+        // PERFORMANCE: Reduced quality to 0.7 for faster upload
+        const imageSrc = canvas.toDataURL('image/jpeg', 0.7);
         onCapture(imageSrc);
       }
     }
@@ -156,7 +158,8 @@ const Scanner: React.FC<ScannerProps> = ({ onCapture, onClose }) => {
              const ctx = canvas.getContext('2d');
              if (ctx) {
                  ctx.drawImage(img, 0, 0, width, height);
-                 onCapture(canvas.toDataURL('image/jpeg', 0.85));
+                 // PERFORMANCE: Reduced quality to 0.7 for faster upload
+                 onCapture(canvas.toDataURL('image/jpeg', 0.7));
              } else {
                  onCapture(base64String); 
              }

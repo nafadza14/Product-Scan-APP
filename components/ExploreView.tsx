@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ExternalLink, Sparkles, BookOpen, Clock, ChevronLeft, Share2, Bookmark } from 'lucide-react';
 import { UserProfile, HealthCondition } from '../types';
 import Card from './Card';
@@ -22,17 +22,11 @@ interface Article {
 
 const ExploreView: React.FC<ExploreViewProps> = ({ userProfile }) => {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
-  const [articles, setArticles] = useState<Article[]>([]);
 
-  // Generate Dummy Data based on Category
-  useEffect(() => {
+  // --- MOCK DATA GENERATOR (Memoized) ---
+  const articles = useMemo(() => {
     const condition = userProfile?.condition || HealthCondition.GENERAL_HEALTH;
-    const generatedArticles = generateArticles(condition);
-    setArticles(generatedArticles);
-  }, [userProfile]);
-
-  // --- MOCK DATA GENERATOR ---
-  const generateArticles = (condition: HealthCondition): Article[] => {
+    
     const commonContent = [
       "In today's fast-paced world, understanding what goes into our bodies is more important than ever. This comprehensive guide breaks down the latest research and practical tips to help you make informed decisions.",
       "Many people overlook the importance of checking labels, but small changes can lead to significant health improvements. We interviewed top nutritionists and dermatologists to bring you the facts without the fear-mongering.",
@@ -164,7 +158,7 @@ const ExploreView: React.FC<ExploreViewProps> = ({ userProfile }) => {
     }
 
     return [...categoryArticles, ...baseArticles];
-  };
+  }, [userProfile?.condition]);
 
   const displayCondition = userProfile?.customConditionName || userProfile?.condition || "You";
 
@@ -177,6 +171,7 @@ const ExploreView: React.FC<ExploreViewProps> = ({ userProfile }) => {
           <img 
             src={selectedArticle.image} 
             alt={selectedArticle.title} 
+            loading="lazy"
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-transparent"></div>
@@ -215,7 +210,7 @@ const ExploreView: React.FC<ExploreViewProps> = ({ userProfile }) => {
           <div className="flex items-center justify-between text-sm text-gray-400 mb-8 border-b border-gray-100 pb-4">
              <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden">
-                  <img src={`https://ui-avatars.com/api/?name=${selectedArticle.author}&background=random`} alt="Author" />
+                  <img src={`https://ui-avatars.com/api/?name=${selectedArticle.author}&background=random`} alt="Author" loading="lazy" />
                 </div>
                 <span className="font-semibold text-gray-700">{selectedArticle.author}</span>
              </div>
@@ -267,7 +262,7 @@ const ExploreView: React.FC<ExploreViewProps> = ({ userProfile }) => {
                <div className="absolute inset-0 bg-[#6FAE9A] rounded-3xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity"></div>
                
                <div className="relative h-80 rounded-3xl overflow-hidden shadow-2xl">
-                  <img src={articles[0].image} alt="Trending" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                  <img src={articles[0].image} alt="Trending" loading="lazy" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
                   
                   <div className="absolute top-6 left-6 flex items-center gap-2">
@@ -302,7 +297,7 @@ const ExploreView: React.FC<ExploreViewProps> = ({ userProfile }) => {
                       className="flex gap-4 items-stretch p-3 hover:shadow-xl hover:border-[#6FAE9A]/30 group transition-all duration-300 !rounded-2xl cursor-pointer"
                    >
                       <div className="w-28 h-28 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0 relative shadow-inner">
-                         <img src={article.image} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                         <img src={article.image} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                          <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors"></div>
                       </div>
                       <div className="flex-1 py-1 flex flex-col justify-between">
