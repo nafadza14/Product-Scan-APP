@@ -1,14 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { ViewState, UserProfile, ScanResult, ScanHistoryItem, ScanStatus } from './types';
-import Onboarding from './components/Onboarding';
-import { Home, Scan, Compass, User, Clock, Activity, ChevronRight, History, Sparkles, Lock, Package } from 'lucide-react';
+import { Home, Scan, Compass, User, History, Sparkles, ChevronRight, Activity, Package } from 'lucide-react';
 import Card from './components/Card';
 import Button from './components/Button';
-import Scanner from './components/Scanner';
-import ResultModal from './components/ResultModal';
-import ExploreView from './components/ExploreView';
-import Auth from './components/Auth';
-import { analyzeImage } from './services/geminiService';
 import { supabase } from './services/supabaseClient';
 import { 
   getUserProfile, 
@@ -20,6 +14,21 @@ import {
   getCachedHistory,
   cacheHistory
 } from './services/dbService';
+
+// --- LAZY LOADED COMPONENTS (Optimization) ---
+// These are split into separate chunks and only loaded when needed.
+const Onboarding = lazy(() => import('./components/Onboarding'));
+const Scanner = lazy(() => import('./components/Scanner'));
+const ResultModal = lazy(() => import('./components/ResultModal'));
+const ExploreView = lazy(() => import('./components/ExploreView'));
+const Auth = lazy(() => import('./components/Auth'));
+
+// Loading Fallback Component
+const LoadingSpinner = () => (
+  <div className="flex items-center justify-center h-full min-h-[50vh] animate-in fade-in duration-300">
+    <div className="w-8 h-8 border-4 border-[#6FAE9A] border-t-transparent rounded-full animate-spin"></div>
+  </div>
+);
 
 const App: React.FC = () => {
   // Default to HOME view for instant access (Guest Mode)
@@ -175,6 +184,10 @@ const App: React.FC = () => {
     const rawBase64 = imageSrc.split(',')[1];
     
     try {
+      // DYNAMIC IMPORT: Load Gemini SDK only when needed
+      // This saves a large amount of initial bundle size
+      const { analyzeImage } = await import('./services/geminiService');
+      
       const result = await analyzeImage(rawBase64, user);
       setScanResult(result);
       
@@ -255,20 +268,31 @@ const App: React.FC = () => {
 
   // ---------- RENDER VIEWS ----------
 
+  // Wrap Lazy Components in Suspense
   if (view === ViewState.AUTH) {
-    return <Auth onCancel={() => setView(ViewState.HOME)} />;
+    return (
+        <Suspense fallback={<LoadingSpinner />}>
+            <Auth onCancel={() => setView(ViewState.HOME)} />
+        </Suspense>
+    );
   }
 
   if (view === ViewState.ONBOARDING) {
-    return <Onboarding onComplete={handleOnboardingComplete} />;
+    return (
+        <Suspense fallback={<LoadingSpinner />}>
+            <Onboarding onComplete={handleOnboardingComplete} />
+        </Suspense>
+    );
   }
 
   if (view === ViewState.SCANNER) {
     return (
-      <Scanner 
-        onCapture={handleScanCapture} 
-        onClose={() => setView(ViewState.HOME)} 
-      />
+        <Suspense fallback={<LoadingSpinner />}>
+            <Scanner 
+                onCapture={handleScanCapture} 
+                onClose={() => setView(ViewState.HOME)} 
+            />
+        </Suspense>
     );
   }
 
@@ -391,7 +415,9 @@ const App: React.FC = () => {
 
       {/* --- EXPLORE VIEW --- */}
       {activeTab === 'Explore' && (
-          <ExploreView userProfile={user} />
+          <Suspense fallback={<LoadingSpinner />}>
+            <ExploreView userProfile={user} />
+          </Suspense>
       )}
 
       {/* --- MY SCAN VIEW --- */}
@@ -503,14 +529,16 @@ const App: React.FC = () => {
 
       {/* --- RESULT MODAL --- */}
       {(isScanning || scanResult) && (
-        <ResultModal 
-          result={scanResult} 
-          isLoading={isScanning}
-          onClose={() => {
-             setScanResult(null);
-             setIsScanning(false);
-          }} 
-        />
+        <Suspense fallback={<LoadingSpinner />}>
+          <ResultModal 
+            result={scanResult} 
+            isLoading={isScanning}
+            onClose={() => {
+              setScanResult(null);
+              setIsScanning(false);
+            }} 
+          />
+        </Suspense>
       )}
 
       {/* --- FLOATING NAVIGATION --- */}
