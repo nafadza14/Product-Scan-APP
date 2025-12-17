@@ -15,12 +15,13 @@ export const analyzeImage = async (
       console.error("Gemini API Key is missing.");
       return {
         productName: "Configuration Error",
+        category: "Other",
         icon: "⚠️",
         status: ScanStatus.CAUTION,
         score: 50,
-        nutriScore: 'C',
         explanation: "API Key missing. Check Vercel Environment Variables.",
         ingredients: [],
+        fullIngredientList: "Not available",
         alternatives: []
       };
   }
@@ -42,37 +43,31 @@ export const analyzeImage = async (
     ? userProfile.currentSymptoms.join(', ')
     : "None";
 
-  // Optimized System Instruction for speed and scoring logic
+  // Optimized System Instruction
   const systemInstruction = `
-    Analyze product label (Food/Skincare) image for safety.
-    User Profile: [Condition: ${conditionLabel}], [Context: ${contextStr}], [Symptoms: ${symptomsStr}].
+    Analyze product label image.
+    Profile: ${conditionLabel}. Context: ${contextStr}. Symptoms: ${symptomsStr}.
     
     Task:
-    1. Identify Product.
-    2. Analyze ingredients against Profile.
-    3. Calculate a "Personalized Safety Score" (0-100). 
-       - 100 is perfectly safe/beneficial for THIS user.
-       - Deduct heavily for allergens or contraindications to user's condition (e.g., Pregnancy, Diabetes).
-       - If contains forbidden ingredient for condition -> Score < 30.
-    4. Assign a "Nutri-Score" equivalent (A, B, C, D, E) based on the Personal Score.
-       - A: 81-100 (Excellent)
-       - B: 61-80 (Good)
-       - C: 41-60 (Average)
-       - D: 21-40 (Poor)
-       - E: 0-20 (Bad)
-    5. Verdict: SAFE (Score > 60), CAUTION (Score 31-60), AVOID (Score < 30).
+    1. Identify Product Name & Category ('Food' or 'Cosmetic').
+    2. Assess safety (SAFE, CAUTION, AVOID) & score (0-100) based on ingredients + profile.
     
-    Output strictly in JSON:
-    {
-      "productName": "string",
-      "icon": "emoji",
-      "status": "SAFE" | "CAUTION" | "AVOID",
-      "score": number,
-      "nutriScore": "A" | "B" | "C" | "D" | "E",
-      "explanation": "Concise verdict tailored to user condition (max 2 sentences).",
-      "ingredients": [{ "name": "string", "riskLevel": "Safe" | "Moderate" | "High Risk", "description": "Detailed explanation of why this specific ingredient is good or bad for the user's condition." }],
-      "alternatives": [{ "name": "string", "reason": "short reason" }]
-    }
+    IF CATEGORY IS 'Food':
+       - Extract Nutrition Advisor (Fat, Sat Fat, Sugar, Salt, Protein).
+       - Determine Dietary Suitability (Vegan, Gluten-Free, etc).
+       - Ingredients: List MODERATE/HIGH risks.
+    
+    IF CATEGORY IS 'Cosmetic' (Skincare, Make-up, Household):
+       - SKIP Nutrition Advisor, Dietary Suitability, NutriScore (return null/empty).
+       - Ingredients: Provide VERY DETAILED analysis of risks (irritants, allergens, comedogenic, hormonal).
+    
+    Common for BOTH:
+       - 'fullIngredientList': Raw text.
+       - 'ingredients': Structured array of RISKS.
+       - 'alternatives': Max 2 healthy/safer swaps.
+       - 'icon': Single emoji.
+    
+    Output strictly JSON.
   `;
 
   try {
@@ -87,7 +82,7 @@ export const analyzeImage = async (
             }
           },
           {
-            text: "Analyze image. Return valid JSON."
+            text: "Analyze. Return valid JSON."
           }
         ]
       },
@@ -104,11 +99,13 @@ export const analyzeImage = async (
           type: Type.OBJECT,
           properties: {
             productName: { type: Type.STRING },
+            category: { type: Type.STRING, enum: ["Food", "Cosmetic", "Other"] },
             icon: { type: Type.STRING },
             status: { type: Type.STRING, enum: ["SAFE", "CAUTION", "AVOID"] },
             score: { type: Type.NUMBER },
-            nutriScore: { type: Type.STRING, enum: ["A", "B", "C", "D", "E"] },
+            nutriScore: { type: Type.STRING, enum: ["A", "B", "C", "D", "E", "N/A"] },
             explanation: { type: Type.STRING },
+            fullIngredientList: { type: Type.STRING },
             ingredients: {
               type: Type.ARRAY,
               items: {
@@ -119,6 +116,26 @@ export const analyzeImage = async (
                   description: { type: Type.STRING }
                 }
               }
+            },
+            nutritionAdvisor: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        name: { type: Type.STRING, enum: ["Fat", "Saturated Fat", "Sugar", "Salt", "Protein"] },
+                        value: { type: Type.STRING },
+                        level: { type: Type.STRING, enum: ["Low", "Medium", "High"] }
+                    }
+                }
+            },
+            dietarySuitability: {
+                type: Type.OBJECT,
+                properties: {
+                    vegan: { type: Type.BOOLEAN },
+                    vegetarian: { type: Type.BOOLEAN },
+                    glutenFree: { type: Type.BOOLEAN },
+                    lactoseFree: { type: Type.BOOLEAN }
+                }
             },
             alternatives: {
               type: Type.ARRAY,
@@ -131,7 +148,7 @@ export const analyzeImage = async (
               }
             }
           },
-          required: ["productName", "status", "score", "nutriScore", "explanation", "ingredients", "alternatives", "icon"]
+          required: ["productName", "category", "status", "score", "explanation", "ingredients", "alternatives", "icon"]
         }
       }
     });
@@ -146,33 +163,39 @@ export const analyzeImage = async (
     if (data.status === 'AVOID') statusEnum = ScanStatus.AVOID;
     if (data.status === 'CAUTION') statusEnum = ScanStatus.CAUTION;
 
+    // Handle N/A NutriScore
+    let finalNutriScore = data.nutriScore;
+    if (finalNutriScore === 'N/A') finalNutriScore = undefined;
+
     return {
       productName: data.productName || "Unknown Product",
+      category: data.category || "Food",
       icon: data.icon || "📦",
       status: statusEnum,
       score: data.score || 50,
-      nutriScore: data.nutriScore || 'C',
+      nutriScore: finalNutriScore,
       explanation: data.explanation || "Analysis complete.",
+      fullIngredientList: data.fullIngredientList || "Ingredients not found.",
       ingredients: data.ingredients || [],
+      nutritionAdvisor: data.nutritionAdvisor || [],
+      dietarySuitability: data.dietarySuitability,
       alternatives: data.alternatives || []
     };
 
   } catch (error: any) {
     console.error("Gemini Analysis Failed:", error);
     
-    let errorMessage = "Could not analyze. Ensure text is clear and try again.";
-    if (error.message?.includes('429')) {
-        errorMessage = "Service busy. Please try again.";
-    }
-
     return {
       productName: "Scan Failed",
+      category: "Other",
       icon: "⚠️",
       status: ScanStatus.CAUTION,
       score: 0,
-      nutriScore: 'E',
-      explanation: errorMessage,
+      explanation: "Could not analyze product. Please try again.",
       ingredients: [],
+      fullIngredientList: "",
+      nutritionAdvisor: [],
+      dietarySuitability: { vegan: false, vegetarian: false, glutenFree: false, lactoseFree: false },
       alternatives: []
     };
   }

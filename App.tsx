@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ViewState, UserProfile, ScanResult, ScanHistoryItem, ScanStatus } from './types';
 import Onboarding from './components/Onboarding';
-import { Home, Scan, Compass, User, Clock, Activity, ChevronRight, History, Sparkles, Lock } from 'lucide-react';
+import { Home, Scan, Compass, User, Clock, Activity, ChevronRight, History, Sparkles, Lock, Package } from 'lucide-react';
 import Card from './components/Card';
 import Button from './components/Button';
 import Scanner from './components/Scanner';
@@ -231,6 +231,12 @@ const App: React.FC = () => {
     }
   };
 
+  // Safe Icon Renderer for Lists
+  const renderIcon = (iconStr?: string) => {
+    if (!iconStr || iconStr.length > 4 || iconStr.includes('_')) return <Package size={24} className="text-[#6FAE9A]" />;
+    return iconStr;
+  };
+
   const NavIcon = ({ icon: Icon, label, isActive, onClick }: any) => (
     <button onClick={onClick} className={`relative flex flex-col items-center gap-1 transition-all duration-300 w-12 ${isActive ? 'text-[#6FAE9A] -translate-y-1' : 'text-gray-400 group hover:text-gray-600'}`}>
       <div className={`p-2 rounded-full transition-all ${isActive ? 'bg-[#6FAE9A]/10' : 'bg-transparent'}`}>
@@ -362,8 +368,8 @@ const App: React.FC = () => {
                             className="flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm border border-gray-50 cursor-pointer active:scale-[0.99] transition-transform hover:shadow-md hover:border-[#6FAE9A]/20"
                         >
                             <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#F0FDF9] to-white border border-[#F0FDF9] flex items-center justify-center text-2xl shadow-sm">
-                                    {item.icon || "📦"}
+                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#F0FDF9] to-white border border-[#F0FDF9] flex items-center justify-center text-2xl shadow-sm overflow-hidden">
+                                    {renderIcon(item.icon)}
                                 </div>
                                 <div>
                                     <p className="font-bold text-gray-800 line-clamp-1">{item.productName}</p>
@@ -411,8 +417,8 @@ const App: React.FC = () => {
                     scanHistory.map((item) => (
                         <div key={item.id} className="flex items-center justify-between p-4 bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setScanResult(item)}>
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-2xl">
-                                {item.icon || "📦"}
+                            <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-2xl overflow-hidden">
+                                {renderIcon(item.icon)}
                             </div>
                             <div>
                                 <p className="font-bold text-gray-800 line-clamp-1">{item.productName}</p>

@@ -86,6 +86,7 @@ export const getScanHistory = async (userId: string): Promise<ScanHistoryItem[]>
     id: item.id,
     timestamp: item.timestamp,
     productName: item.product_name,
+    category: item.category || 'Food', // Default to Food for backward compatibility
     icon: item.icon,
     status: item.status,
     explanation: item.explanation,
@@ -101,6 +102,7 @@ export const addScanResult = async (userId: string, result: ScanHistoryItem) => 
       id: result.id,
       user_id: userId,
       product_name: result.productName,
+      category: result.category, // Assuming DB has been updated, or this might be ignored if col doesn't exist depending on config
       icon: result.icon,
       status: result.status,
       explanation: result.explanation,

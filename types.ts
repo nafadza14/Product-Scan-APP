@@ -39,14 +39,31 @@ export interface IngredientAnalysis {
   description: string;
 }
 
+export interface MacroNutrient {
+  name: 'Fat' | 'Saturated Fat' | 'Sugar' | 'Salt' | 'Protein';
+  value: string; // e.g., "1.8g"
+  level: 'Low' | 'Medium' | 'High';
+}
+
+export interface DietarySuitability {
+  vegan: boolean;
+  vegetarian: boolean;
+  glutenFree: boolean;
+  lactoseFree: boolean;
+}
+
 export interface ScanResult {
   productName: string;
+  category: 'Food' | 'Cosmetic' | 'Other'; // Added Category
   icon?: string; // Emoji representation
   status: ScanStatus;
   score: number; // 0 to 100
-  nutriScore: 'A' | 'B' | 'C' | 'D' | 'E';
+  nutriScore?: 'A' | 'B' | 'C' | 'D' | 'E'; // Optional for non-food
   explanation: string;
-  ingredients: IngredientAnalysis[];
+  ingredients: IngredientAnalysis[]; // Risk analysis ingredients
+  fullIngredientList: string; // Full text list
+  nutritionAdvisor?: MacroNutrient[]; // Optional for non-food
+  dietarySuitability?: DietarySuitability; // Optional for non-food
   alternatives: Array<{ name: string; reason: string }>;
 }
 

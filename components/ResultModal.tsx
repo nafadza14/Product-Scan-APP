@@ -1,6 +1,6 @@
 import React from 'react';
-import { ScanResult, ScanStatus } from '../types';
-import { CheckCircle2, X, AlertTriangle, Ban, Info } from 'lucide-react';
+import { ScanResult, ScanStatus, MacroNutrient } from '../types';
+import { CheckCircle2, X, AlertTriangle, Ban, Info, Leaf, Wheat, Milk, Check, Droplet, Candy, Dumbbell, Flame, Package } from 'lucide-react';
 import Button from './Button';
 import Card from './Card';
 
@@ -10,7 +10,7 @@ interface ResultModalProps {
   isLoading: boolean;
 }
 
-// Helper to get color based on score (Matches Nutri-Score logic)
+// Helper to get color based on score
 const getScoreColor = (score: number) => {
     if (score >= 81) return '#1E8F4E'; // A - Dark Green
     if (score >= 61) return '#7AC943'; // B - Light Green
@@ -29,7 +29,12 @@ const ScoreGauge = ({ score }: { score: number }) => {
   const activeColor = getScoreColor(score);
 
   return (
-    <div className="relative flex flex-col items-center justify-center -mt-2">
+    <div className="relative flex flex-col items-center justify-center">
+      {/* Label moved to top */}
+      <div className="absolute top-2 left-0 right-0 flex justify-center z-10">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Safety Score</span>
+      </div>
+
       <div className="relative flex items-center justify-center w-40 h-40">
         <svg
           height={radius * 2}
@@ -64,20 +69,19 @@ const ScoreGauge = ({ score }: { score: number }) => {
           />
         </svg>
         
-        {/* Centered Text */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center pt-2">
+        {/* Centered Number */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center pt-5">
             <span 
-                className="text-4xl font-black tracking-tight transition-colors duration-300"
+                className="text-4xl font-black tracking-tight transition-colors duration-300 leading-none"
                 style={{ color: activeColor }}
             >
                 {score}
             </span>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mt-1">Safety Score</span>
         </div>
       </div>
       
       {/* Context Label */}
-      <div className="mt-[-20px] bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full border border-gray-100 shadow-sm z-10">
+      <div className="mt-[-25px] bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full border border-gray-100 shadow-sm z-10">
         <p className="text-[10px] font-bold text-gray-500 text-center whitespace-nowrap">
             According to your condition
         </p>
@@ -88,17 +92,12 @@ const ScoreGauge = ({ score }: { score: number }) => {
 
 const NutriScoreBadge = ({ score }: { score: string }) => {
     const scores = ['A', 'B', 'C', 'D', 'E'];
-    // Official Nutri-Score Colors
     const colors: Record<string, string> = {
-        'A': '#1E8F4E', // Dark Green
-        'B': '#7AC943', // Light Green
-        'C': '#FFD200', // Yellow
-        'D': '#F7931E', // Orange
-        'E': '#E53935'  // Red
+        'A': '#1E8F4E', 'B': '#7AC943', 'C': '#FFD200', 'D': '#F7931E', 'E': '#E53935'
     };
 
     return (
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center justify-center h-full pb-6">
             <span className="text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Nutri-Score</span>
             <div className="flex items-center bg-gray-100 p-1 rounded-xl shadow-inner">
                 {scores.map((s) => {
@@ -123,12 +122,63 @@ const NutriScoreBadge = ({ score }: { score: string }) => {
                             }}
                         >
                             {s}
-                            {isActive && (
-                                <div className="absolute inset-0 border border-white/20 rounded-lg"></div>
-                            )}
                         </div>
                     );
                 })}
+            </div>
+        </div>
+    );
+};
+
+// --- Sub-Components for Breakdown ---
+
+const NutritionPreferenceRow = ({ icon, label, isSuitable }: { icon: React.ReactNode, label: string, isSuitable: boolean | undefined }) => (
+    <div className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
+        <div className="flex items-center gap-3">
+            <div className="text-gray-400">{icon}</div>
+            <span className="text-sm font-medium text-[#1C1C1C]">{label}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+            {isSuitable ? (
+                <>
+                  <Check size={16} className="text-green-500" />
+                  <span className="text-xs font-bold text-gray-600">Probably</span>
+                </>
+            ) : (
+                <>
+                  <X size={16} className="text-gray-300" />
+                  <span className="text-xs font-medium text-gray-400">Unlikely</span>
+                </>
+            )}
+        </div>
+    </div>
+);
+
+const NutritionAdvisorRow = ({ item }: { item: MacroNutrient }) => {
+    // Icon mapping
+    const getIcon = (name: string) => {
+        if (name.includes('Fat')) return <Droplet size={18} />;
+        if (name.includes('Sugar')) return <Candy size={18} />;
+        if (name.includes('Salt')) return <Flame size={18} />; // Abstract for salt
+        if (name.includes('Protein')) return <Dumbbell size={18} />;
+        return <Info size={18} />;
+    };
+
+    const getColor = (level: string) => {
+        if (level === 'Low' || (item.name === 'Protein' && level === 'High')) return 'bg-green-500'; // Protein high is good
+        if (level === 'Medium') return 'bg-yellow-400';
+        return 'bg-red-500';
+    };
+
+    return (
+        <div className="flex items-center justify-between py-4 border-b border-gray-50 last:border-0">
+            <div className="flex items-center gap-3">
+                <div className="text-gray-400 p-2 bg-gray-50 rounded-lg">{getIcon(item.name)}</div>
+                <span className="text-sm font-bold text-[#1C1C1C]">{item.name}</span>
+            </div>
+            <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-500 font-medium">{item.level}</span>
+                <div className={`w-3 h-3 rounded-full ${getColor(item.level)}`}></div>
             </div>
         </div>
     );
@@ -149,44 +199,13 @@ const ResultModal: React.FC<ResultModalProps> = ({ result, onClose, isLoading })
 
   if (!result) return null;
 
-  const getVerdictData = (status: ScanStatus) => {
-    switch (status) {
-      case ScanStatus.SAFE: 
-        return { 
-            bg: 'bg-[#1E8F4E]', 
-            text: 'text-white', 
-            icon: <CheckCircle2 size={24} className="text-white" />, 
-            title: 'Recommended',
-            sub: 'Safe for your condition'
-        };
-      case ScanStatus.CAUTION: 
-        return { 
-            bg: 'bg-[#FFD200]', 
-            text: 'text-[#1C1C1C]', 
-            icon: <AlertTriangle size={24} className="text-[#1C1C1C]" />, 
-            title: 'Consume with Caution',
-            sub: 'Moderate risks detected'
-        };
-      case ScanStatus.AVOID: 
-        return { 
-            bg: 'bg-[#E53935]', 
-            text: 'text-white', 
-            icon: <Ban size={24} className="text-white" />, 
-            title: 'Not Recommended',
-            sub: 'High risk ingredients found'
-        };
-      default: 
-        return { 
-            bg: 'bg-gray-500', 
-            text: 'text-white', 
-            icon: <Info size={24} />, 
-            title: 'Unknown Status',
-            sub: 'Analysis inconclusive'
-        };
-    }
+  const isCosmetic = result.category === 'Cosmetic';
+  
+  // Render safe icon
+  const renderIcon = (iconStr?: string) => {
+    if (!iconStr || iconStr.length > 4) return <Package size={48} className="text-[#6FAE9A]" />;
+    return iconStr;
   };
-
-  const verdict = getVerdictData(result.status);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center sm:justify-center pointer-events-none">
@@ -194,9 +213,11 @@ const ResultModal: React.FC<ResultModalProps> = ({ result, onClose, isLoading })
       
       <div className="bg-[#F8F9FA] w-full sm:w-[450px] sm:rounded-3xl rounded-t-[2.5rem] max-h-[92vh] overflow-y-auto pointer-events-auto transform transition-transform duration-300 ease-out shadow-[0px_-10px_40px_rgba(0,0,0,0.2)] no-scrollbar flex flex-col">
         
-        {/* Navigation / Close */}
+        {/* Navigation */}
         <div className="sticky top-0 z-20 bg-[#F8F9FA]/95 backdrop-blur-xl p-4 flex justify-between items-center border-b border-gray-100">
-            <h2 className="font-bold text-gray-400 text-xs uppercase tracking-widest">Analysis Result</h2>
+            <h2 className="font-bold text-gray-400 text-xs uppercase tracking-widest">
+                {isCosmetic ? 'Skincare Analysis' : 'Nutrition Analysis'}
+            </h2>
             <button onClick={onClose} className="p-2 bg-gray-200 rounded-full hover:bg-gray-300 transition-colors">
                 <X size={18} />
             </button>
@@ -204,35 +225,54 @@ const ResultModal: React.FC<ResultModalProps> = ({ result, onClose, isLoading })
 
         <div className="p-6 pt-4 pb-12">
             
-            {/* Top Section: Icon, Score, NutriScore */}
+            {/* Header Identity */}
             <div className="flex flex-col items-center mb-8">
-                <div className="w-24 h-24 rounded-[2rem] bg-white shadow-lg border border-gray-100 flex items-center justify-center text-6xl mb-4">
-                    {result.icon}
+                <div className="w-24 h-24 rounded-[2rem] bg-white shadow-lg border border-gray-100 flex items-center justify-center text-6xl mb-4 overflow-hidden">
+                    {renderIcon(result.icon)}
                 </div>
-                <h1 className="text-2xl font-extrabold text-[#1C1C1C] text-center leading-tight mb-8 max-w-[280px]">
+                <h1 className="text-2xl font-extrabold text-[#1C1C1C] text-center leading-tight mb-2 max-w-[280px]">
                     {result.productName}
                 </h1>
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-6 bg-gray-100 px-2 py-1 rounded-md">
+                    {result.category}
+                </span>
                 
-                <div className="flex w-full justify-between items-start px-2 sm:px-4 gap-4">
-                    <div className="flex-1 flex justify-center">
-                        <NutriScoreBadge score={result.nutriScore} />
-                    </div>
-                    <div className="h-24 w-[1px] bg-gray-200 mt-2"></div>
-                    <div className="flex-1 flex justify-center">
+                {/* SCORES - Conditional Layout */}
+                <div className="flex w-full items-center justify-center gap-6 sm:gap-8 px-2">
+                    {/* Only show NutriScore if Food AND available */}
+                    {!isCosmetic && result.nutriScore && (
+                        <>
+                        <div className="flex-shrink-0">
+                            <NutriScoreBadge score={result.nutriScore} />
+                        </div>
+                        <div className="h-16 w-[1px] bg-gray-200"></div>
+                        </>
+                    )}
+                    <div className="flex-shrink-0">
                         <ScoreGauge score={result.score} />
                     </div>
                 </div>
             </div>
 
             {/* Verdict Card */}
-            <div className={`w-full rounded-2xl p-5 mb-8 shadow-xl ${verdict.bg} ${verdict.text} transition-colors duration-300`}>
+            <div className={`w-full rounded-2xl p-5 mb-8 shadow-xl transition-colors duration-300
+                ${result.status === ScanStatus.SAFE ? 'bg-[#1E8F4E] text-white' : 
+                  result.status === ScanStatus.CAUTION ? 'bg-[#FFD200] text-[#1C1C1C]' : 'bg-[#E53935] text-white'}
+            `}>
                 <div className="flex items-center gap-3 mb-3">
                     <div className="p-2 bg-white/20 rounded-full backdrop-blur-sm">
-                        {verdict.icon}
+                        {result.status === ScanStatus.SAFE ? <CheckCircle2 size={24} /> : 
+                         result.status === ScanStatus.CAUTION ? <AlertTriangle size={24} /> : <Ban size={24} />}
                     </div>
                     <div>
-                        <span className="font-bold text-lg block leading-none mb-1">{verdict.title}</span>
-                        <span className="text-xs opacity-90 font-medium uppercase tracking-wide">{verdict.sub}</span>
+                        <span className="font-bold text-lg block leading-none mb-1">
+                             {result.status === ScanStatus.SAFE ? 'Recommended' : 
+                              result.status === ScanStatus.CAUTION ? 'Consume with Caution' : 'Not Recommended'}
+                        </span>
+                        <span className="text-xs opacity-90 font-medium uppercase tracking-wide">
+                             {result.status === ScanStatus.SAFE ? 'Safe for your condition' : 
+                              result.status === ScanStatus.CAUTION ? 'Moderate risks detected' : 'High risk ingredients found'}
+                        </span>
                     </div>
                 </div>
                 <p className={`text-sm font-medium leading-relaxed opacity-95 p-3 rounded-xl bg-black/5`}>
@@ -240,58 +280,92 @@ const ResultModal: React.FC<ResultModalProps> = ({ result, onClose, isLoading })
                 </p>
             </div>
 
-            {/* Ingredient Breakdown */}
+            {/* FOOD SECTIONS - HIDDEN FOR COSMETICS */}
+            {!isCosmetic && (
+                <>
+                {/* 1. Nutrition Preference */}
+                {result.dietarySuitability && (
+                    <div className="mb-8">
+                        <h3 className="text-lg font-bold mb-4 text-[#1C1C1C]">Nutrition Preference</h3>
+                        <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100">
+                            <NutritionPreferenceRow icon={<Leaf size={20} />} label="Vegan" isSuitable={result.dietarySuitability?.vegan} />
+                            <NutritionPreferenceRow icon={<Leaf size={20} className="text-green-600" />} label="Vegetarian" isSuitable={result.dietarySuitability?.vegetarian} />
+                            <NutritionPreferenceRow icon={<Wheat size={20} />} label="Gluten-Free" isSuitable={result.dietarySuitability?.glutenFree} />
+                            <NutritionPreferenceRow icon={<Milk size={20} />} label="Free of Lactose" isSuitable={result.dietarySuitability?.lactoseFree} />
+                        </div>
+                    </div>
+                )}
+
+                {/* 2. Nutrition Advisor */}
+                {result.nutritionAdvisor && result.nutritionAdvisor.length > 0 && (
+                    <div className="mb-8">
+                        <h3 className="text-lg font-bold mb-4 text-[#1C1C1C]">Nutrition Advisor</h3>
+                        <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100">
+                            {result.nutritionAdvisor.map((macro, idx) => (
+                                <NutritionAdvisorRow key={idx} item={macro} />
+                            ))}
+                        </div>
+                    </div>
+                )}
+                </>
+            )}
+
+            {/* 3. Ingredients - ALWAYS SHOW */}
             <div className="mb-8">
-                <h3 className="text-lg font-bold mb-4 text-[#1C1C1C] flex items-center gap-2">
-                    Nutrition Preference
-                </h3>
-                <div className="bg-white rounded-3xl p-2 shadow-sm border border-gray-100">
-                    {result.ingredients.length > 0 ? result.ingredients.map((ing, idx) => (
-                        <div key={idx} className="flex items-start justify-between p-4 border-b border-gray-50 last:border-0">
-                            <div className="flex items-start gap-4">
-                                <div className={`mt-0.5 p-1.5 rounded-full ${
-                                    ing.riskLevel === 'Safe' ? 'bg-green-100 text-green-600' : 
-                                    ing.riskLevel === 'High Risk' ? 'bg-red-100 text-red-600' : 
-                                    'bg-yellow-100 text-yellow-600'
-                                }`}>
-                                    {ing.riskLevel === 'Safe' ? <CheckCircle2 size={16} /> : 
-                                     ing.riskLevel === 'High Risk' ? <Ban size={16} /> : 
-                                     <AlertTriangle size={16} />}
-                                </div>
-                                <div>
-                                    <span className="font-bold text-gray-800 text-sm block mb-1">{ing.name}</span>
-                                    <p className="text-xs text-gray-500 leading-relaxed">{ing.description}</p>
-                                </div>
-                            </div>
-                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md ml-2 shrink-0 ${
-                                ing.riskLevel === 'Safe' ? 'bg-green-50 text-green-600' : 
-                                ing.riskLevel === 'High Risk' ? 'bg-red-50 text-red-600' : 
-                                'bg-yellow-50 text-yellow-600'
-                            }`}>
-                                {ing.riskLevel === 'Safe' ? 'Safe' : ing.riskLevel}
-                            </span>
-                        </div>
-                    )) : (
-                        <div className="p-6 text-center">
-                            <p className="text-gray-400 text-sm">No specific ingredient warnings found.</p>
-                        </div>
-                    )}
+                <div className="flex justify-between items-end mb-4">
+                     <h3 className="text-lg font-bold text-[#1C1C1C]">Ingredients Analysis</h3>
+                     <span className="text-xs font-bold text-[#6FAE9A] bg-[#6FAE9A]/10 px-2 py-1 rounded-md">
+                         {result.ingredients.filter(i => i.riskLevel !== 'Safe').length} Risks Found
+                     </span>
+                </div>
+                
+                {/* Risk Breakdown first */}
+                {result.ingredients.filter(i => i.riskLevel !== 'Safe').length > 0 && (
+                    <div className="mb-4 bg-red-50 rounded-2xl p-4 border border-red-100">
+                         {result.ingredients.filter(i => i.riskLevel !== 'Safe').map((ing, i) => (
+                             <div key={i} className="mb-3 last:mb-0">
+                                 <div className="flex items-center gap-2 text-red-700 font-bold text-sm mb-1">
+                                     <AlertTriangle size={14} />
+                                     {ing.name}
+                                 </div>
+                                 <p className="text-xs text-red-600/80 leading-snug">{ing.description}</p>
+                             </div>
+                         ))}
+                    </div>
+                )}
+
+                {/* Full Text List */}
+                <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
+                    <p className="text-sm text-gray-600 leading-relaxed font-medium">
+                        {result.fullIngredientList || "Ingredient list not detected."}
+                    </p>
                 </div>
             </div>
-            
-            {/* Alternatives */}
+
+            {/* 4. Better Alternatives - ALWAYS SHOW */}
             {result.alternatives.length > 0 && (
                 <div className="mb-6">
-                  <h3 className="text-lg font-bold mb-4 text-[#1C1C1C]">Better Alternatives</h3>
-                  <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6 no-scrollbar">
+                  <div className="flex items-center justify-between mb-4">
+                     <h3 className="text-lg font-bold text-[#1C1C1C]">Better Alternatives</h3>
+                     <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">Scroll for more</span>
+                  </div>
+                  
+                  {/* Horizontal Scroll with "Peek" effect */}
+                  <div className="flex overflow-x-auto pb-6 -mx-6 px-6 no-scrollbar snap-x snap-mandatory">
                      {result.alternatives.map((alt, idx) => (
-                       <Card key={idx} variant="standard" className="min-w-[220px] p-5 border-gray-100 flex flex-col gap-3 flex-shrink-0 !rounded-2xl hover:scale-[1.02]">
-                          <div className="w-8 h-8 rounded-full bg-[#EAF4F0] flex items-center justify-center text-[#6FAE9A]">
-                            <CheckCircle2 size={16} />
+                       <Card 
+                            key={idx} 
+                            variant="standard" 
+                            className="w-[200px] mr-4 p-4 border-gray-100 flex flex-col gap-2 flex-shrink-0 !rounded-2xl hover:scale-[1.02] snap-center shadow-md"
+                        >
+                          <div className="flex items-center justify-between">
+                              <div className="w-8 h-8 rounded-full bg-[#EAF4F0] flex items-center justify-center text-[#6FAE9A]">
+                                <CheckCircle2 size={16} />
+                              </div>
                           </div>
                           <div>
-                            <p className="font-bold text-sm text-gray-800 leading-tight mb-1">{alt.name}</p>
-                            <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{alt.reason}</p>
+                            <p className="font-bold text-sm text-gray-800 leading-tight mb-1 line-clamp-2 min-h-[2.5rem]">{alt.name}</p>
+                            <p className="text-[10px] text-gray-500 line-clamp-3 leading-relaxed">{alt.reason}</p>
                           </div>
                        </Card>
                      ))}
