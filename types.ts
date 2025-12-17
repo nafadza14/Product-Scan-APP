@@ -1,3 +1,4 @@
+
 export enum ViewState {
   AUTH = 'AUTH',
   ONBOARDING = 'ONBOARDING',
@@ -42,6 +43,8 @@ export interface ScanResult {
   productName: string;
   icon?: string; // Emoji representation
   status: ScanStatus;
+  score: number; // 0 to 100
+  nutriScore: 'A' | 'B' | 'C' | 'D' | 'E';
   explanation: string;
   ingredients: IngredientAnalysis[];
   alternatives: Array<{ name: string; reason: string }>;
@@ -56,4 +59,16 @@ export interface DashboardStat {
   label: string;
   value: string;
   trend?: 'up' | 'down' | 'neutral';
+}
+
+export interface Article {
+  id: string;
+  title: string;
+  category: string;
+  source: string;
+  sourceUrl: string;
+  date: string;
+  readTime: string;
+  content: string[]; // Array of paragraphs for in-app reading
+  summary: string;
 }

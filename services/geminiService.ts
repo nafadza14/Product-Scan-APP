@@ -17,6 +17,8 @@ export const analyzeImage = async (
         productName: "Configuration Error",
         icon: "⚠️",
         status: ScanStatus.CAUTION,
+        score: 50,
+        nutriScore: 'C',
         explanation: "API Key missing. Check Vercel Environment Variables.",
         ingredients: [],
         alternatives: []
@@ -40,7 +42,7 @@ export const analyzeImage = async (
     ? userProfile.currentSymptoms.join(', ')
     : "None";
 
-  // Optimized System Instruction for speed (fewer input tokens)
+  // Optimized System Instruction for speed and scoring logic
   const systemInstruction = `
     Analyze product label (Food/Skincare) image for safety.
     User Profile: [Condition: ${conditionLabel}], [Context: ${contextStr}], [Symptoms: ${symptomsStr}].
@@ -48,15 +50,27 @@ export const analyzeImage = async (
     Task:
     1. Identify Product.
     2. Analyze ingredients against Profile.
-    3. Verdict: SAFE, CAUTION, or AVOID.
+    3. Calculate a "Personalized Safety Score" (0-100). 
+       - 100 is perfectly safe/beneficial for THIS user.
+       - Deduct heavily for allergens or contraindications to user's condition (e.g., Pregnancy, Diabetes).
+       - If contains forbidden ingredient for condition -> Score < 30.
+    4. Assign a "Nutri-Score" equivalent (A, B, C, D, E) based on the Personal Score.
+       - A: 81-100 (Excellent)
+       - B: 61-80 (Good)
+       - C: 41-60 (Average)
+       - D: 21-40 (Poor)
+       - E: 0-20 (Bad)
+    5. Verdict: SAFE (Score > 60), CAUTION (Score 31-60), AVOID (Score < 30).
     
     Output strictly in JSON:
     {
       "productName": "string",
       "icon": "emoji",
       "status": "SAFE" | "CAUTION" | "AVOID",
-      "explanation": "Concise verdict (max 2 sentences).",
-      "ingredients": [{ "name": "string", "riskLevel": "Safe" | "Moderate" | "High Risk", "description": "Very short reason" }],
+      "score": number,
+      "nutriScore": "A" | "B" | "C" | "D" | "E",
+      "explanation": "Concise verdict tailored to user condition (max 2 sentences).",
+      "ingredients": [{ "name": "string", "riskLevel": "Safe" | "Moderate" | "High Risk", "description": "Detailed explanation of why this specific ingredient is good or bad for the user's condition." }],
       "alternatives": [{ "name": "string", "reason": "short reason" }]
     }
   `;
@@ -92,6 +106,8 @@ export const analyzeImage = async (
             productName: { type: Type.STRING },
             icon: { type: Type.STRING },
             status: { type: Type.STRING, enum: ["SAFE", "CAUTION", "AVOID"] },
+            score: { type: Type.NUMBER },
+            nutriScore: { type: Type.STRING, enum: ["A", "B", "C", "D", "E"] },
             explanation: { type: Type.STRING },
             ingredients: {
               type: Type.ARRAY,
@@ -115,7 +131,7 @@ export const analyzeImage = async (
               }
             }
           },
-          required: ["productName", "status", "explanation", "ingredients", "alternatives", "icon"]
+          required: ["productName", "status", "score", "nutriScore", "explanation", "ingredients", "alternatives", "icon"]
         }
       }
     });
@@ -134,6 +150,8 @@ export const analyzeImage = async (
       productName: data.productName || "Unknown Product",
       icon: data.icon || "📦",
       status: statusEnum,
+      score: data.score || 50,
+      nutriScore: data.nutriScore || 'C',
       explanation: data.explanation || "Analysis complete.",
       ingredients: data.ingredients || [],
       alternatives: data.alternatives || []
@@ -143,7 +161,6 @@ export const analyzeImage = async (
     console.error("Gemini Analysis Failed:", error);
     
     let errorMessage = "Could not analyze. Ensure text is clear and try again.";
-    
     if (error.message?.includes('429')) {
         errorMessage = "Service busy. Please try again.";
     }
@@ -152,6 +169,8 @@ export const analyzeImage = async (
       productName: "Scan Failed",
       icon: "⚠️",
       status: ScanStatus.CAUTION,
+      score: 0,
+      nutriScore: 'E',
       explanation: errorMessage,
       ingredients: [],
       alternatives: []
