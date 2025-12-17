@@ -8,6 +8,9 @@ interface ExploreViewProps {
   userProfile: UserProfile | null;
 }
 
+// Fallback image if source fails
+const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1499209974431-2761e2523676?auto=format&fit=crop&w=800&q=80";
+
 const ExploreView: React.FC<ExploreViewProps> = ({ userProfile }) => {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
@@ -20,6 +23,11 @@ const ExploreView: React.FC<ExploreViewProps> = ({ userProfile }) => {
 
   const displayCondition = userProfile?.customConditionName || userProfile?.condition || "General Health";
 
+  // Handle Image Error
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+      e.currentTarget.src = FALLBACK_IMAGE;
+  };
+
   // --- FULL ARTICLE RENDERER ---
   if (selectedArticle) {
     const heroImage = getDeterministicImage(selectedArticle);
@@ -27,11 +35,12 @@ const ExploreView: React.FC<ExploreViewProps> = ({ userProfile }) => {
     return (
       <div className="fixed inset-0 z-50 bg-white overflow-y-auto animate-in slide-in-from-bottom-10 flex flex-col no-scrollbar">
         {/* Hero Image */}
-        <div className="relative h-72 sm:h-80 w-full flex-shrink-0">
+        <div className="relative h-72 sm:h-80 w-full flex-shrink-0 bg-gray-100">
           <img 
             src={heroImage} 
             alt={selectedArticle.title} 
             referrerPolicy="no-referrer"
+            onError={handleImageError}
             className="w-full h-full object-cover object-center"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-transparent"></div>
@@ -155,6 +164,7 @@ const ExploreView: React.FC<ExploreViewProps> = ({ userProfile }) => {
                     alt="Trending" 
                     referrerPolicy="no-referrer"
                     loading="lazy"
+                    onError={handleImageError}
                     className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105" 
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
@@ -191,12 +201,13 @@ const ExploreView: React.FC<ExploreViewProps> = ({ userProfile }) => {
                         onClick={() => setSelectedArticle(article)}
                         className="flex gap-4 items-stretch p-3 hover:shadow-xl hover:border-[#6FAE9A]/30 group transition-all duration-300 !rounded-2xl cursor-pointer"
                     >
-                        <div className="w-28 h-28 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0 relative shadow-inner">
+                        <div className="w-28 h-28 rounded-xl bg-gray-200 overflow-hidden flex-shrink-0 relative shadow-inner">
                             <img 
                                 src={getDeterministicImage(article)} 
                                 alt="" 
                                 referrerPolicy="no-referrer"
                                 loading="lazy"
+                                onError={handleImageError}
                                 className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700" 
                             />
                             <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors"></div>
