@@ -2,9 +2,13 @@ import React, { useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import Button from './Button';
 import Card from './Card';
-import { ShieldCheck, AlertCircle, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Mail, Lock, User, Eye, EyeOff, X } from 'lucide-react';
 
-const Auth: React.FC = () => {
+interface AuthProps {
+    onCancel?: () => void;
+}
+
+const Auth: React.FC<AuthProps> = ({ onCancel }) => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -48,11 +52,21 @@ const Auth: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden">
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden animate-in fade-in zoom-in duration-300">
       
       {/* Background Orbs */}
       <div className="absolute top-[-10%] left-[-10%] w-[300px] h-[300px] bg-[#6FAE9A]/20 rounded-full blur-[80px] animate-float"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[300px] h-[300px] bg-[#4D8C7A]/20 rounded-full blur-[80px] animate-float" style={{ animationDelay: '2s' }}></div>
+
+      {/* Close Button */}
+      {onCancel && (
+          <button 
+            onClick={onCancel}
+            className="absolute top-6 right-6 z-20 p-2 bg-white/40 backdrop-blur-md rounded-full text-gray-600 hover:bg-white/60 transition-colors"
+          >
+              <X size={24} />
+          </button>
+      )}
 
       {/* Main Content */}
       <div className="w-full max-w-sm relative z-10">

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ViewState, UserProfile, ScanResult, ScanHistoryItem, ScanStatus } from './types';
 import Onboarding from './components/Onboarding';
-import { Home, Scan, Compass, User, Clock, Activity, ChevronRight, History, Sparkles } from 'lucide-react';
+import { Home, Scan, Compass, User, Clock, Activity, ChevronRight, History, Sparkles, Lock } from 'lucide-react';
 import Card from './components/Card';
 import Button from './components/Button';
 import Scanner from './components/Scanner';
@@ -22,7 +22,8 @@ import {
 } from './services/dbService';
 
 const App: React.FC = () => {
-  const [view, setView] = useState<ViewState>(ViewState.AUTH);
+  // Default to HOME view for instant access (Guest Mode)
+  const [view, setView] = useState<ViewState>(ViewState.HOME);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
@@ -40,9 +41,10 @@ const App: React.FC = () => {
         // 1. Get Session (Fast local check usually)
         const { data: { session }, error } = await supabase.auth.getSession();
         
+        // If no session, we stay in Guest Mode (Home View)
         if (error || !session?.user) {
            if (mounted) {
-               setView(ViewState.AUTH);
+               console.log("No active session, starting in Guest Mode");
                setLoadingApp(false);
            }
            return;
@@ -59,8 +61,8 @@ const App: React.FC = () => {
            console.log("Loaded from cache");
            setUser(cachedUser);
            if (cachedHistory) setScanHistory(cachedHistory);
-           setView(ViewState.HOME);
-           setLoadingApp(false); // Unblock UI immediately
+           // We are already at HOME by default
+           setLoadingApp(false); 
         }
 
         // 3. BACKGROUND SYNC: Fetch Fresh Data
@@ -73,30 +75,22 @@ const App: React.FC = () => {
             if (profile) {
                 setUser(profile);
                 cacheProfile(currentUserId, profile); // Update Cache
-                
-                // If we didn't have cache before, now we render home
-                if (!cachedUser) {
-                    setView(ViewState.HOME);
-                    setLoadingApp(false);
-                }
-            } else {
-                // Profile missing in DB (rare edge case or first login)
-                if (!cachedUser) setView(ViewState.ONBOARDING);
-                setLoadingApp(false);
+            } else if (session.user) {
+                // User exists but no profile? Go to Onboarding
+                setView(ViewState.ONBOARDING);
             }
 
             if (history) {
                 setScanHistory(history);
                 cacheHistory(currentUserId, history); // Update Cache
             }
+            
+            setLoadingApp(false);
         }
 
       } catch (err) {
         console.error("Initialization error:", err);
-        if (mounted && loadingApp) {
-             setView(ViewState.AUTH);
-             setLoadingApp(false);
-        }
+        if (mounted) setLoadingApp(false);
       }
     };
 
@@ -120,13 +114,12 @@ const App: React.FC = () => {
         } else {
           setView(ViewState.ONBOARDING);
         }
-        setLoadingApp(false);
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setUserId(null);
         setScanHistory([]);
-        setView(ViewState.AUTH);
-        setLoadingApp(false);
+        // Don't force Auth view, just go to Guest Home
+        setView(ViewState.HOME);
       }
     });
 
@@ -151,6 +144,26 @@ const App: React.FC = () => {
     setUser(profile);
     setView(ViewState.HOME);
   };
+
+  // --- NEW LOGIC: Intercept Actions ---
+  const handleScanAction = () => {
+    if (!user) {
+      // Guest tried to scan -> Force Login
+      setView(ViewState.AUTH);
+    } else {
+      setView(ViewState.SCANNER);
+    }
+  };
+
+  const handleProfileAccess = () => {
+    setActiveTab('Profile');
+  };
+
+  const handleHistoryAccess = () => {
+    setActiveTab('MyScan');
+  };
+
+  // ------------------------------------
 
   const handleScanCapture = async (imageSrc: string) => {
     setView(ViewState.HOME); 
@@ -237,7 +250,7 @@ const App: React.FC = () => {
   // ---------- RENDER VIEWS ----------
 
   if (view === ViewState.AUTH) {
-    return <Auth />;
+    return <Auth onCancel={() => setView(ViewState.HOME)} />;
   }
 
   if (view === ViewState.ONBOARDING) {
@@ -269,16 +282,22 @@ const App: React.FC = () => {
                   <h1 className="text-3xl font-bold text-[#1C1C1C] tracking-tight">{getGreeting()},</h1>
                   {/* Gradient Text for Name */}
                   <p className="font-extrabold text-2xl text-transparent bg-clip-text bg-gradient-to-r from-[#6FAE9A] to-[#3B6E5F] truncate max-w-[200px]">
-                    {user?.name?.split(' ')[0]}
+                    {user ? user.name.split(' ')[0] : "Guest"}
                   </p>
                </div>
-               <div className="w-12 h-12 rounded-full bg-white/50 backdrop-blur-md border-2 border-white p-0.5 shadow-md overflow-hidden cursor-pointer active:scale-95 transition-transform" onClick={() => setActiveTab('Profile')}>
-                  <img src={`https://ui-avatars.com/api/?name=${user?.name}&background=6FAE9A&color=fff`} alt="Profile" className="w-full h-full object-cover rounded-full" />
+               <div className="w-12 h-12 rounded-full bg-white/50 backdrop-blur-md border-2 border-white p-0.5 shadow-md overflow-hidden cursor-pointer active:scale-95 transition-transform" onClick={handleProfileAccess}>
+                  {user ? (
+                    <img src={`https://ui-avatars.com/api/?name=${user.name}&background=6FAE9A&color=fff`} alt="Profile" className="w-full h-full object-cover rounded-full" />
+                  ) : (
+                    <div className="w-full h-full rounded-full bg-gray-200 flex items-center justify-center text-gray-400">
+                       <User size={20} />
+                    </div>
+                  )}
                </div>
              </div>
 
              {/* Condition Check-in Card (Highlighted) */}
-             <Card variant="highlight" className="mb-6 p-5 relative overflow-hidden group cursor-pointer border-[#6FAE9A]/20" onClick={() => setView(ViewState.ONBOARDING)}>
+             <Card variant="highlight" className="mb-6 p-5 relative overflow-hidden group cursor-pointer border-[#6FAE9A]/20" onClick={() => user ? setView(ViewState.ONBOARDING) : setView(ViewState.AUTH)}>
                 <div className="absolute top-0 right-0 w-32 h-32 bg-[#6FAE9A]/15 rounded-full blur-2xl -mr-10 -mt-10 group-hover:bg-[#6FAE9A]/25 transition-colors"></div>
                 <div className="relative z-10">
                     <div className="flex items-center gap-2 mb-2">
@@ -288,16 +307,16 @@ const App: React.FC = () => {
                         <span className="text-xs font-bold text-[#6FAE9A] uppercase tracking-wider">Daily Check-in</span>
                     </div>
                     <h3 className="font-bold text-xl text-[#1C1C1C] mb-1">How is your condition today?</h3>
-                    <p className="text-sm text-gray-500 mb-3 font-medium">Update symptoms for accurate results.</p>
+                    <p className="text-sm text-gray-500 mb-3 font-medium">{user ? "Update symptoms for accurate results." : "Sign in to track your symptoms."}</p>
                     <div className="flex items-center gap-1 text-[#6FAE9A] font-bold text-sm group-hover:gap-2 transition-all">
-                        <span>Update Status</span>
+                        <span>{user ? "Update Status" : "Get Started"}</span>
                         <ChevronRight size={16} />
                     </div>
                 </div>
              </Card>
 
              {/* Scan Action Card - Stronger Gradient */}
-             <div className="mb-8" onClick={() => setView(ViewState.SCANNER)}>
+             <div className="mb-8" onClick={handleScanAction}>
                 <Card variant="standard" className="p-2 flex items-center gap-4 cursor-pointer !border-none !shadow-[0_10px_30px_rgba(111,174,154,0.15)] group active:scale-[0.98]">
                     <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-[#6FAE9A] to-[#428070] flex items-center justify-center text-white shadow-lg shadow-[#6FAE9A]/30 group-hover:shadow-[#6FAE9A]/50 transition-all">
                         <Scan size={36} className="group-hover:scale-110 transition-transform drop-shadow-md" />
@@ -319,11 +338,19 @@ const App: React.FC = () => {
              <div>
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="font-bold text-[#1C1C1C] text-lg">Recent Scans</h3>
-                    <button className="text-xs text-[#6FAE9A] font-bold uppercase tracking-wide hover:bg-[#6FAE9A]/10 px-2 py-1 rounded-md transition-colors" onClick={() => setActiveTab('MyScan')}>View All</button>
+                    {user && <button className="text-xs text-[#6FAE9A] font-bold uppercase tracking-wide hover:bg-[#6FAE9A]/10 px-2 py-1 rounded-md transition-colors" onClick={() => setActiveTab('MyScan')}>View All</button>}
                 </div>
 
                 <div className="space-y-3">
-                    {scanHistory.length === 0 ? (
+                    {!user ? (
+                        <div className="text-center py-10 bg-white/40 rounded-3xl border border-white/50 border-dashed cursor-pointer hover:bg-white/60 transition-colors" onClick={handleScanAction}>
+                            <div className="flex justify-center mb-3">
+                                <div className="p-3 bg-[#6FAE9A]/10 rounded-full text-[#6FAE9A]"><Scan size={24} /></div>
+                            </div>
+                            <p className="text-sm text-gray-700 font-bold mb-1">Let's scan product now</p>
+                            <p className="text-xs text-gray-500 font-medium">Analyze ingredients instantly.</p>
+                        </div>
+                    ) : scanHistory.length === 0 ? (
                         <div className="text-center py-10 bg-white/40 rounded-3xl border border-white/50 border-dashed">
                             <p className="text-sm text-gray-400 font-medium">No scans yet. Try scanning an item!</p>
                         </div>
@@ -366,31 +393,40 @@ const App: React.FC = () => {
          <div className="p-6 pt-12 animate-in fade-in duration-500 min-h-screen">
             <h1 className="text-3xl font-extrabold mb-6 text-[#1C1C1C]">History</h1>
 
-            <div className="space-y-3 pb-24">
-               {scanHistory.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-20 opacity-50">
-                     <History size={48} className="mb-4" />
-                     <p className="text-gray-500 font-medium">No history yet.</p>
-                  </div>
-               ) : (
-                  scanHistory.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-4 bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setScanResult(item)}>
-                       <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-2xl">
-                             {item.icon || "📦"}
-                          </div>
-                          <div>
-                             <p className="font-bold text-gray-800 line-clamp-1">{item.productName}</p>
-                             <p className="text-xs text-gray-400 font-medium">{formatTimeAgo(item.timestamp)}</p>
-                          </div>
-                       </div>
-                       <span className={`px-3 py-1 rounded-full text-[10px] font-bold border ${getStatusStyles(item.status)}`}>
-                          {item.status}
-                       </span>
+            {!user ? (
+                 <div className="flex flex-col items-center justify-center py-20 text-center">
+                     <div className="w-16 h-16 bg-[#F0FDF9] rounded-full flex items-center justify-center mb-4 text-[#6FAE9A] shadow-sm"><Scan size={32} /></div>
+                     <h3 className="text-lg font-bold text-gray-800 mb-2">Let's scan product now</h3>
+                     <p className="text-gray-500 max-w-xs mb-6 px-4">Create an account to save your history and track your health journey.</p>
+                     <Button onClick={() => setView(ViewState.AUTH)}>Get Started</Button>
+                 </div>
+            ) : (
+                <div className="space-y-3 pb-24">
+                {scanHistory.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 opacity-50">
+                        <History size={48} className="mb-4" />
+                        <p className="text-gray-500 font-medium">No history yet.</p>
                     </div>
-                  ))
-               )}
-            </div>
+                ) : (
+                    scanHistory.map((item) => (
+                        <div key={item.id} className="flex items-center justify-between p-4 bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/50 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setScanResult(item)}>
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-2xl">
+                                {item.icon || "📦"}
+                            </div>
+                            <div>
+                                <p className="font-bold text-gray-800 line-clamp-1">{item.productName}</p>
+                                <p className="text-xs text-gray-400 font-medium">{formatTimeAgo(item.timestamp)}</p>
+                            </div>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold border ${getStatusStyles(item.status)}`}>
+                            {item.status}
+                        </span>
+                        </div>
+                    ))
+                )}
+                </div>
+            )}
          </div>
       )}
       
@@ -398,48 +434,64 @@ const App: React.FC = () => {
       {activeTab === 'Profile' && (
          <div className="p-6 pt-12 animate-in fade-in duration-500">
             <h1 className="text-3xl font-extrabold mb-8 text-center text-[#1C1C1C]">Profile</h1>
-            <div className="flex flex-col items-center mb-10">
-               <div className="w-28 h-28 rounded-full p-1 bg-gradient-to-br from-[#6FAE9A] to-[#4D8C7A] mb-4 shadow-xl shadow-[#6FAE9A]/20">
-                  <div className="w-full h-full rounded-full border-4 border-white overflow-hidden bg-white">
-                    <img src={`https://ui-avatars.com/api/?name=${user?.name}&background=6FAE9A&color=fff`} alt="Profile" className="w-full h-full object-cover" />
-                  </div>
-               </div>
-               <h2 className="text-2xl font-bold">{user?.name}</h2>
-               <div className="flex items-center gap-2 mt-2 px-3 py-1 bg-green-50 rounded-full border border-green-100">
-                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                 <p className="text-green-700 text-xs font-bold uppercase tracking-wide">Active</p>
-               </div>
-            </div>
+            
+            {!user ? (
+                <div className="flex flex-col items-center">
+                    <div className="w-28 h-28 rounded-full bg-gray-100 flex items-center justify-center mb-6 border-4 border-white shadow-lg">
+                        <User size={48} className="text-gray-300" />
+                    </div>
+                    <h2 className="text-2xl font-bold mb-2">Guest User</h2>
+                    <p className="text-gray-500 text-center mb-8 px-8">Create an account to personalize your health scanner and save your preferences.</p>
+                    
+                    <Button fullWidth onClick={() => setView(ViewState.AUTH)} className="mb-4">Create Account</Button>
+                    <Button variant="ghost" fullWidth onClick={() => setView(ViewState.AUTH)}>Sign In</Button>
+                </div>
+            ) : (
+                <>
+                <div className="flex flex-col items-center mb-10">
+                <div className="w-28 h-28 rounded-full p-1 bg-gradient-to-br from-[#6FAE9A] to-[#4D8C7A] mb-4 shadow-xl shadow-[#6FAE9A]/20">
+                    <div className="w-full h-full rounded-full border-4 border-white overflow-hidden bg-white">
+                        <img src={`https://ui-avatars.com/api/?name=${user?.name}&background=6FAE9A&color=fff`} alt="Profile" className="w-full h-full object-cover" />
+                    </div>
+                </div>
+                <h2 className="text-2xl font-bold">{user?.name}</h2>
+                <div className="flex items-center gap-2 mt-2 px-3 py-1 bg-green-50 rounded-full border border-green-100">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                    <p className="text-green-700 text-xs font-bold uppercase tracking-wide">Active</p>
+                </div>
+                </div>
 
-            <Card variant="highlight" className="mb-6 shadow-md border-white">
-               <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
-                  <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Condition</p>
-                  <Activity size={16} className="text-[#6FAE9A]" />
-               </div>
-               <p className="font-bold text-xl text-[#1C1C1C] mb-2">
-                  {user?.customConditionName || user?.condition}
-               </p>
-               {user?.additionalContext?.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                     {user.additionalContext.map((ctx, i) => (
-                        <span key={i} className="text-xs bg-white text-[#6FAE9A] px-2 py-1 rounded-md font-semibold border border-[#6FAE9A]/10 shadow-sm max-w-full truncate">{ctx}</span>
-                     ))}
-                  </div>
-               )}
-            </Card>
+                <Card variant="highlight" className="mb-6 shadow-md border-white">
+                <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-2">
+                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Condition</p>
+                    <Activity size={16} className="text-[#6FAE9A]" />
+                </div>
+                <p className="font-bold text-xl text-[#1C1C1C] mb-2">
+                    {user?.customConditionName || user?.condition}
+                </p>
+                {user?.additionalContext?.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                        {user.additionalContext.map((ctx, i) => (
+                            <span key={i} className="text-xs bg-white text-[#6FAE9A] px-2 py-1 rounded-md font-semibold border border-[#6FAE9A]/10 shadow-sm max-w-full truncate">{ctx}</span>
+                        ))}
+                    </div>
+                )}
+                </Card>
 
-            <div className="space-y-3">
-                <Button 
-                variant="secondary" 
-                fullWidth 
-                onClick={() => setView(ViewState.ONBOARDING)}
-                className="bg-white"
-                >
-                Edit Health Profile
-                </Button>
+                <div className="space-y-3">
+                    <Button 
+                    variant="secondary" 
+                    fullWidth 
+                    onClick={() => setView(ViewState.ONBOARDING)}
+                    className="bg-white"
+                    >
+                    Edit Health Profile
+                    </Button>
 
-                <Button variant="ghost" fullWidth onClick={handleSignOut}>Sign Out</Button>
-            </div>
+                    <Button variant="ghost" fullWidth onClick={handleSignOut}>Sign Out</Button>
+                </div>
+                </>
+            )}
          </div>
       )}
 
@@ -460,7 +512,7 @@ const App: React.FC = () => {
          {/* Floating Scan Button (Center - GREEN MATCHING) */}
          <div className="absolute left-1/2 -translate-x-1/2 -top-6 z-40">
             <button 
-              onClick={() => setView(ViewState.SCANNER)}
+              onClick={handleScanAction}
               className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#6FAE9A] to-[#4D8C7A] text-white shadow-[0_10px_30px_rgba(111,174,154,0.5)] flex items-center justify-center border-4 border-[#F0FDF9] active:scale-95 transition-all hover:shadow-[0_15px_40px_rgba(111,174,154,0.6)] hover:-translate-y-1"
             >
               <Scan size={28} className="drop-shadow-md" />
@@ -478,8 +530,8 @@ const App: React.FC = () => {
             <div className="w-16"></div>
 
             <div className="flex-1 flex justify-around">
-               <NavIcon icon={History} label="History" isActive={activeTab === 'MyScan'} onClick={() => setActiveTab('MyScan')} />
-               <NavIcon icon={User} label="Profile" isActive={activeTab === 'Profile'} onClick={() => setActiveTab('Profile')} />
+               <NavIcon icon={History} label="History" isActive={activeTab === 'MyScan'} onClick={handleHistoryAccess} />
+               <NavIcon icon={User} label="Profile" isActive={activeTab === 'Profile'} onClick={handleProfileAccess} />
             </div>
          </div>
       </div>
