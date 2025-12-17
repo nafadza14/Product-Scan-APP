@@ -101,7 +101,7 @@ export const getScanHistory = async (userId: string): Promise<ScanHistoryItem[]>
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
-        .limit(20); // Reduced limit for faster initial load
+        .limit(20);
 
     if (error) {
         console.error('Error fetching history:', error);
@@ -117,7 +117,13 @@ export const getScanHistory = async (userId: string): Promise<ScanHistoryItem[]>
         status: item.status,
         explanation: item.explanation,
         ingredients: item.ingredients,
-        alternatives: item.alternatives
+        alternatives: item.alternatives,
+        // Ensure all detailed analysis fields are mapped
+        score: item.score || 0,
+        nutriScore: item.nutri_score,
+        fullIngredientList: item.full_ingredient_list || '',
+        nutritionAdvisor: item.nutrition_advisor || [],
+        dietarySuitability: item.dietary_suitability || undefined
     }));
   } catch (e) {
     return [];
@@ -138,7 +144,13 @@ export const addScanResult = async (userId: string, result: ScanHistoryItem) => 
       explanation: result.explanation,
       ingredients: result.ingredients,
       alternatives: result.alternatives,
-      timestamp: result.timestamp
+      timestamp: result.timestamp,
+      // Save full analysis details
+      score: result.score,
+      nutri_score: result.nutriScore,
+      full_ingredient_list: result.fullIngredientList,
+      nutrition_advisor: result.nutritionAdvisor,
+      dietary_suitability: result.dietarySuitability
     }).then(({ error }) => {
        if (error) console.error('Error adding scan:', error);
     });
