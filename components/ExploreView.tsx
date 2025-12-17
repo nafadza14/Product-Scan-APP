@@ -32,7 +32,7 @@ const ExploreView: React.FC<ExploreViewProps> = ({ userProfile }) => {
             src={heroImage} 
             alt={selectedArticle.title} 
             referrerPolicy="no-referrer"
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover object-center"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-transparent"></div>
           
@@ -154,7 +154,8 @@ const ExploreView: React.FC<ExploreViewProps> = ({ userProfile }) => {
                     src={getDeterministicImage(articles[0])} 
                     alt="Trending" 
                     referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
+                    loading="lazy"
+                    className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105" 
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
                   
@@ -195,7 +196,8 @@ const ExploreView: React.FC<ExploreViewProps> = ({ userProfile }) => {
                                 src={getDeterministicImage(article)} 
                                 alt="" 
                                 referrerPolicy="no-referrer"
-                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                                loading="lazy"
+                                className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700" 
                             />
                             <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors"></div>
                         </div>
