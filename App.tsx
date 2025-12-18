@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { ViewState, UserProfile, ScanResult, ScanHistoryItem, ScanStatus, AppLanguage } from './types';
-import { Home, Scan, Compass, User, ClipboardList, Sparkles, ChevronRight, Activity, Package, Key, AlertCircle, Globe, Droplet, Utensils, Zap, History, Check, X, Star, ChevronLeft, Heart, Smile } from 'lucide-react';
+import { ViewState, UserProfile, ScanResult, ScanHistoryItem, ScanStatus, AppLanguage, HealthCondition } from './types';
+import { Home, Scan, Compass, User, ClipboardList, Sparkles, ChevronRight, Activity, Package, Key, AlertCircle, Globe, Droplet, Utensils, Zap, History, Check, X, Star, ChevronLeft, Heart, Smile, Trophy, ArrowDownWideNarrow, Medal } from 'lucide-react';
 import Card from './components/Card';
 import Button from './components/Button';
 import { supabase } from './services/supabaseClient';
@@ -59,7 +60,13 @@ const translations = {
     scanFace: "Scan your face",
     scanEat: "Scan what you eat",
     yourFavorites: "Your Favorites",
-    favoritesUserScan: "Favourites user scan"
+    favoritesUserScan: "Favourites user scan",
+    rankingsTitle: "Safety Rankings",
+    rankingsDesc: "Personalized ranking for",
+    bestScore: "Best Safety Scores",
+    scoreLabel: "Safety Score",
+    basedOn: "Based on",
+    hallOfFame: "Hall of Fame"
   },
   [AppLanguage.ID]: {
     greeting: "Halo,",
@@ -103,7 +110,13 @@ const translations = {
     scanFace: "Pindai wajah Anda",
     scanEat: "Pindai makanan Anda",
     yourFavorites: "Favorit Anda",
-    favoritesUserScan: "Favorit pindaian pengguna"
+    favoritesUserScan: "Favorit pindaian pengguna",
+    rankingsTitle: "Peringkat Keamanan",
+    rankingsDesc: "Peringkat personal untuk",
+    bestScore: "Skor Keamanan Terbaik",
+    scoreLabel: "Skor Keamanan",
+    basedOn: "Berdasarkan",
+    hallOfFame: "Daftar Unggulan"
   },
   [AppLanguage.AR]: {
     greeting: "مرحباً،",
@@ -147,7 +160,13 @@ const translations = {
     scanFace: "امسح وجهك",
     scanEat: "امسح ما تأكله",
     yourFavorites: "مفضلاتك",
-    favoritesUserScan: "مفضلات فحص المستخدم"
+    favoritesUserScan: "مفضلات فحص المستخدم",
+    rankingsTitle: "تصنيفات السلامة",
+    rankingsDesc: "ترتيب شخصي لـ",
+    bestScore: "أفضل درجات السلامة",
+    scoreLabel: "درجة السلامة",
+    basedOn: "بناء على",
+    hallOfFame: "قاعة المشاهير"
   },
   [AppLanguage.FR]: {
     greeting: "Bonjour,",
@@ -191,7 +210,13 @@ const translations = {
     scanFace: "Scannez votre visage",
     scanEat: "Scannez votre repas",
     yourFavorites: "Vos Favoris",
-    favoritesUserScan: "Favoris de l'utilisateur"
+    favoritesUserScan: "Favoris de l'utilisateur",
+    rankingsTitle: "Classements de Sécurité",
+    rankingsDesc: "Classement personnalisé pour",
+    bestScore: "Meilleurs Scores de Sécurité",
+    scoreLabel: "Score de Sécurité",
+    basedOn: "Basé sur",
+    hallOfFame: "Temple de la renommée"
   },
   [AppLanguage.ZH]: {
     greeting: "你好，",
@@ -235,7 +260,13 @@ const translations = {
     scanFace: "扫描您的脸部",
     scanEat: "扫描您的食物",
     yourFavorites: "您的收藏",
-    favoritesUserScan: "用户扫描收藏"
+    favoritesUserScan: "用户扫描收藏",
+    rankingsTitle: "安全排名",
+    rankingsDesc: "个性化排名：",
+    bestScore: "最佳安全得分",
+    scoreLabel: "安全得分",
+    basedOn: "基于",
+    hallOfFame: "名人堂"
   }
 };
 
@@ -461,7 +492,19 @@ const App: React.FC = () => {
     </button>
   );
 
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-green-500';
+    if (score >= 40) return 'text-yellow-500';
+    return 'text-red-500';
+  };
+
   const userFavorites = scanHistory.filter(item => item.isFavorite);
+  // Get favorites for the home screen horizontal scroll (max 9)
+  const homeFavorites = userFavorites.slice(0, 9);
+  // Sort history for ranking (100 to 0)
+  const rankedScans = [...scanHistory].sort((a, b) => b.score - a.score);
+  
+  const currentConditionLabel = user?.customConditionName || user?.condition || "General Health";
 
   if (loadingApp) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -472,6 +515,73 @@ const App: React.FC = () => {
   if (view === ViewState.AUTH) return <Suspense fallback={<LoadingSpinner />}><Auth onCancel={() => setView(ViewState.HOME)} /></Suspense>;
   if (view === ViewState.ONBOARDING) return <Suspense fallback={<LoadingSpinner />}><Onboarding onComplete={(p) => { updateUserProfile(userId!, p); setUser(p); setView(ViewState.HOME); }} /></Suspense>;
   if (view === ViewState.SCANNER) return <Suspense fallback={<LoadingSpinner />}><Scanner onCapture={handleScanCapture} onClose={() => setView(ViewState.HOME)} /></Suspense>;
+
+  // FULL-SCREEN RANKING VIEW
+  if (view === ViewState.RANKING) {
+    return (
+      <div className={`min-h-screen bg-[#F0FDF9] pb-10 animate-in slide-in-from-right-10 duration-500 ${isRTL ? 'rtl' : 'ltr'}`} dir={isRTL ? 'rtl' : 'ltr'}>
+        <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100 p-6 pt-12 flex items-center justify-between">
+           <button onClick={() => setView(ViewState.HOME)} className="p-2 bg-gray-100 rounded-full text-gray-500">
+              <ChevronLeft size={24} />
+           </button>
+           <h1 className="text-xl font-black text-[#1C1C1C]">{t.rankingsTitle}</h1>
+           <div className="w-10 h-10 rounded-full bg-[#6FAE9A]/10 flex items-center justify-center text-[#6FAE9A]">
+              <Trophy size={20} />
+           </div>
+        </div>
+
+        <div className="p-6">
+           <div className="bg-[#6FAE9A] rounded-3xl p-6 text-white mb-8 shadow-xl relative overflow-hidden">
+              <div className="relative z-10">
+                 <div className="flex items-center gap-2 mb-2">
+                   <Medal size={16} className="text-yellow-300" />
+                   <span className="text-xs font-bold uppercase tracking-widest text-white/80">{t.hallOfFame}</span>
+                 </div>
+                 <h2 className="text-2xl font-black mb-1">{t.bestScore}</h2>
+                 <p className="text-white/80 text-sm font-medium">
+                   {t.rankingsDesc} <span className="text-white font-bold underline decoration-white/40">{currentConditionLabel}</span>
+                 </p>
+              </div>
+              <ArrowDownWideNarrow size={120} className="absolute -right-8 -bottom-8 opacity-10 transform rotate-12" />
+           </div>
+
+           <div className="space-y-4">
+              {rankedScans.length > 0 ? rankedScans.map((item, index) => (
+                 <div 
+                    key={item.id} 
+                    onClick={() => { setScanResult(item); setIsModalFromHistory(true); }}
+                    className="flex items-center justify-between p-5 bg-white rounded-[2rem] shadow-sm border border-white hover:shadow-md transition-all active:scale-95 cursor-pointer group"
+                 >
+                    <div className="flex items-center gap-5">
+                       <div className="relative">
+                          <div className={`w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center text-3xl shadow-inner group-hover:scale-110 transition-transform`}>
+                             {renderIcon(item.icon)}
+                          </div>
+                          <div className={`absolute -top-2 -left-2 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black border-2 border-white shadow-sm ${index === 0 ? 'bg-yellow-400 text-white' : index === 1 ? 'bg-gray-300 text-white' : index === 2 ? 'bg-amber-600 text-white' : 'bg-[#6FAE9A] text-white'}`}>
+                             #{index + 1}
+                          </div>
+                       </div>
+                       <div>
+                          <p className="font-bold text-gray-800 text-base line-clamp-1">{item.productName}</p>
+                          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">{item.category}</span>
+                       </div>
+                    </div>
+                    <div className="flex flex-col items-end">
+                       <span className={`text-2xl font-black ${getScoreColor(item.score)}`}>{item.score}</span>
+                       <span className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">{t.scoreLabel}</span>
+                    </div>
+                 </div>
+              )) : (
+                 <div className="text-center py-20 text-gray-400">
+                    <History size={48} className="mx-auto mb-4 opacity-10" />
+                    <p className="font-bold">{t.noScans}</p>
+                 </div>
+              )}
+           </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen pb-32 relative overflow-hidden ${isRTL ? 'rtl' : 'ltr'}`} dir={isRTL ? 'rtl' : 'ltr'}>
@@ -584,66 +694,46 @@ const App: React.FC = () => {
                 </div>
              </div>
 
-             {/* YOUR FAVORITES HORIZONTAL SCROLL */}
-             {userFavorites.length > 0 && (
-                 <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="flex items-center justify-between mb-4 px-1">
-                        <div className="flex items-center gap-2">
-                            <Heart size={18} className="text-rose-500 fill-rose-500" />
-                            <h3 className="font-bold text-lg text-[#1C1C1C]">{t.yourFavorites}</h3>
+             {/* FAVOURITES USER SCAN - HORIZONTAL SCROLL 9 CARDS */}
+             {homeFavorites.length > 0 && (
+                 <div className="mt-2 pt-4 border-t border-gray-200/40 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="flex items-center justify-between mb-6 px-1">
+                        <div>
+                          <h3 className="font-black text-2xl text-[#1C1C1C] leading-none mb-1">{t.favoritesUserScan}</h3>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{t.basedOn} {currentConditionLabel}</p>
                         </div>
+                        <button 
+                           onClick={() => setView(ViewState.RANKING)}
+                           className="text-xs font-bold text-[#6FAE9A] bg-[#6FAE9A]/10 px-4 py-2 rounded-full hover:bg-[#6FAE9A]/20 transition-all flex items-center gap-1 active:scale-95"
+                        >
+                           {t.viewAll} <ChevronRight size={14} />
+                        </button>
                     </div>
                     
-                    <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 -mx-6 px-6">
-                        {userFavorites.map((item) => (
+                    <div className="flex gap-5 overflow-x-auto no-scrollbar pb-6 -mx-6 px-6 snap-x">
+                        {homeFavorites.map((item) => (
                             <div 
                                 key={item.id} 
                                 onClick={() => { setScanResult(item); setIsModalFromHistory(true); }}
-                                className="w-32 flex-shrink-0 bg-white/70 backdrop-blur-md border border-white/60 p-3 rounded-2xl shadow-sm hover:shadow-md transition-all active:scale-95"
+                                className="w-[180px] h-[260px] flex-shrink-0 bg-white rounded-[2.5rem] shadow-[0_10px_30px_rgba(0,0,0,0.03)] border border-white p-5 flex flex-col items-center justify-between hover:shadow-lg transition-all active:scale-95 snap-center group"
                             >
-                                <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-xl mb-3">
+                                <div className="w-20 h-20 rounded-3xl bg-gray-50 flex items-center justify-center text-4xl shadow-inner group-hover:scale-110 transition-transform">
                                     {renderIcon(item.icon)}
                                 </div>
-                                <p className="text-[11px] font-bold text-gray-800 line-clamp-1 mb-1">{item.productName}</p>
-                                <div className="flex items-center justify-between">
-                                    <span className={`w-1.5 h-1.5 rounded-full ${item.status === ScanStatus.SAFE ? 'bg-green-500' : item.status === ScanStatus.AVOID ? 'bg-red-500' : 'bg-yellow-500'}`}></span>
-                                    <span className="text-[9px] font-bold text-gray-400">{item.score}%</span>
+                                
+                                <div className="flex flex-col items-center text-center mt-2 w-full">
+                                    <p className="text-sm font-black text-gray-800 line-clamp-2 leading-tight mb-1">{item.productName}</p>
+                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{item.category}</span>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
-                 </div>
-             )}
 
-             {/* VERTICAL FAVORITES LIST AT BOTTOM */}
-             {userFavorites.length > 0 && (
-                 <div className="mt-4 pt-8 border-t border-gray-200/50">
-                    <div className="flex items-center justify-between mb-6 px-1">
-                        <h3 className="font-black text-2xl text-[#1C1C1C]">{t.favoritesUserScan}</h3>
-                    </div>
-                    <div className="space-y-4">
-                        {userFavorites.map((item) => (
-                             <div 
-                                key={item.id} 
-                                onClick={() => { setScanResult(item); setIsModalFromHistory(true); }}
-                                className="flex items-center justify-between p-4 bg-white/80 backdrop-blur-sm rounded-[2rem] shadow-sm border border-white/50 cursor-pointer group hover:shadow-md transition-all"
-                            >
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-2xl group-hover:scale-105 transition-transform">
-                                        {renderIcon(item.icon)}
+                                <div className="w-full flex items-center justify-between mt-4 pt-4 border-t border-gray-50">
+                                    <div className="flex flex-col">
+                                        <span className={`text-xl font-black ${getScoreColor(item.score)}`}>{item.score}</span>
+                                        <span className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">Score</span>
                                     </div>
-                                    <div>
-                                        <p className="font-bold text-gray-800 text-sm line-clamp-1">{item.productName}</p>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">{item.category}</span>
-                                            <span className="w-1 h-1 rounded-full bg-gray-200"></span>
-                                            <span className="text-[10px] text-gray-400 font-medium uppercase">{formatTimeAgo(item.timestamp)}</span>
-                                        </div>
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${item.status === ScanStatus.SAFE ? 'bg-green-100 text-green-500' : item.status === ScanStatus.AVOID ? 'bg-red-100 text-red-500' : 'bg-yellow-100 text-yellow-500'}`}>
+                                       {item.status === ScanStatus.SAFE ? <Check size={16} strokeWidth={3} /> : item.status === ScanStatus.AVOID ? <X size={16} strokeWidth={3} /> : <AlertCircle size={16} strokeWidth={3} />}
                                     </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <Star size={20} fill="#FFD200" className="text-[#FFD200]" />
-                                    <div className={`w-3 h-3 rounded-full ${item.status === ScanStatus.SAFE ? 'bg-green-500' : item.status === ScanStatus.AVOID ? 'bg-red-500' : 'bg-yellow-500'}`}></div>
                                 </div>
                             </div>
                         ))}
@@ -780,7 +870,7 @@ const App: React.FC = () => {
                             </div>
                         )) : (
                             <div className="flex flex-col items-center py-20 text-gray-300">
-                                <History size={48} className="mb-4 opacity-20" />
+                                <History size={48} className="mx-auto mb-4 opacity-20" />
                                 <p className="font-bold">{historyCategory === 'favorites' ? t.noFavorites : t.noScans}</p>
                             </div>
                         )}

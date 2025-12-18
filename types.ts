@@ -6,7 +6,8 @@ export enum ViewState {
   SCANNER = 'SCANNER',
   RESULT = 'RESULT',
   PANTRY = 'PANTRY',
-  PROFILE = 'PROFILE'
+  PROFILE = 'PROFILE',
+  RANKING = 'RANKING'
 }
 
 export enum AppLanguage {

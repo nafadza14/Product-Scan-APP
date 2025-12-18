@@ -1,3 +1,4 @@
+
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -9,8 +10,9 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     define: {
-      // This is crucial for Vercel: it maps the system environment variable to process.env.API_KEY
-      'process.env.API_KEY': JSON.stringify(env.API_KEY || env.VITE_API_KEY || "")
+      // Priority: Vercel/System Env -> Local .env -> Empty String
+      // This ensures AI analysis works on live deployments
+      'process.env.API_KEY': JSON.stringify(process.env.API_KEY || env.API_KEY || env.VITE_API_KEY || "")
     },
     build: {
       outDir: 'dist',
