@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { ViewState, UserProfile, ScanResult, ScanHistoryItem, ScanStatus, AppLanguage } from './types';
-import { Home, Scan, Compass, User, ClipboardList, Sparkles, ChevronRight, Activity, Package, Key, AlertCircle, Globe, Droplet, Utensils, Zap, History, Check, X, Star, ChevronLeft } from 'lucide-react';
+import { Home, Scan, Compass, User, ClipboardList, Sparkles, ChevronRight, Activity, Package, Key, AlertCircle, Globe, Droplet, Utensils, Zap, History, Check, X, Star, ChevronLeft, Heart, Smile } from 'lucide-react';
 import Card from './components/Card';
 import Button from './components/Button';
 import { supabase } from './services/supabaseClient';
@@ -29,8 +29,9 @@ const translations = {
     howAreYou: "How are you feeling?",
     updateStatus: "Update status for better results.",
     scanProduct: "Scan Product",
-    scanPrompt: "Point at label",
-    foodOrSkincare: "(Food or Cosmetic)",
+    scanPrompt: "Point camera at",
+    scanAnyLabel: "any label",
+    scanFoodSkincare: "(Food or Skincare)",
     recentHistory: "Recent History",
     viewAll: "View All",
     routine: "My Routine",
@@ -55,7 +56,11 @@ const translations = {
     favorites: "Favorites",
     recent: "Recent",
     noFavorites: "No favorites yet.",
-    noScans: "Start scanning to see your history."
+    noScans: "Start scanning to see your history.",
+    scanFace: "Scan your face",
+    scanEat: "Scan what you eat",
+    yourFavorites: "Your Favorites",
+    favoritesUserScan: "Favourites user scan"
   },
   [AppLanguage.ID]: {
     greeting: "Halo,",
@@ -68,8 +73,9 @@ const translations = {
     howAreYou: "Bagaimana kondisi Anda?",
     updateStatus: "Perbarui gejala untuk hasil akurat.",
     scanProduct: "Pindai Produk",
-    scanPrompt: "Arahkan ke label",
-    foodOrSkincare: "(Makanan atau Kosmetik)",
+    scanPrompt: "Arahkan kamera ke",
+    scanAnyLabel: "label apa pun",
+    scanFoodSkincare: "(Makanan atau Skincare)",
     recentHistory: "Riwayat Terakhir",
     viewAll: "Lihat Semua",
     routine: "Rutinitas Saya",
@@ -94,7 +100,11 @@ const translations = {
     favorites: "Favorit",
     recent: "Terbaru",
     noFavorites: "Belum ada favorit.",
-    noScans: "Mulai memindai untuk melihat riwayat."
+    noScans: "Mulai memindai untuk melihat riwayat.",
+    scanFace: "Pindai wajah Anda",
+    scanEat: "Pindai makanan Anda",
+    yourFavorites: "Favorit Anda",
+    favoritesUserScan: "Favorit pindaian pengguna"
   },
   [AppLanguage.AR]: {
     greeting: "مرحباً،",
@@ -107,8 +117,9 @@ const translations = {
     howAreYou: "كيف تشعر اليوم؟",
     updateStatus: "تحديث الحالة لنتائج أفضل.",
     scanProduct: "مسح منتج",
-    scanPrompt: "وجه الكاميرا للملصق",
-    foodOrSkincare: "(طعام أو تجميل)",
+    scanPrompt: "وجه الكاميرا نحو",
+    scanAnyLabel: "أي ملصق",
+    scanFoodSkincare: "(طعام أو عناية بالبشرة)",
     recentHistory: "السجل الأخير",
     viewAll: "عرض الكل",
     routine: "روتيني",
@@ -133,7 +144,11 @@ const translations = {
     favorites: "المفضلة",
     recent: "الأخيرة",
     noFavorites: "لا توجد مفضلات بعد.",
-    noScans: "ابدأ المسح لرؤية سجلك."
+    noScans: "ابدأ المسح لرؤية سجلك.",
+    scanFace: "امسح وجهك",
+    scanEat: "امسح ما تأكله",
+    yourFavorites: "مفضلاتك",
+    favoritesUserScan: "مفضلات فحص المستخدم"
   },
   [AppLanguage.FR]: {
     greeting: "Bonjour,",
@@ -146,8 +161,9 @@ const translations = {
     howAreYou: "Comment vous sentez-vous ?",
     updateStatus: "Mettez à jour votre statut pour de meilleurs résultats.",
     scanProduct: "Scanner un produit",
-    scanPrompt: "Pointez vers l'étiquette",
-    foodOrSkincare: "(Aliments ou Cosmétiques)",
+    scanPrompt: "Pointez la caméra sur",
+    scanAnyLabel: "n'importe quelle étiquette",
+    scanFoodSkincare: "(Aliments ou Soins)",
     recentHistory: "Historique Récent",
     viewAll: "Voir Tout",
     routine: "Ma Routine",
@@ -172,7 +188,11 @@ const translations = {
     favorites: "Favoris",
     recent: "Récents",
     noFavorites: "Aucun favori pour le moment.",
-    noScans: "Commencez à scanner pour voir votre historique."
+    noScans: "Commencez à scanner pour voir votre historique.",
+    scanFace: "Scannez votre visage",
+    scanEat: "Scannez votre repas",
+    yourFavorites: "Vos Favoris",
+    favoritesUserScan: "Favoris de l'utilisateur"
   },
   [AppLanguage.ZH]: {
     greeting: "你好，",
@@ -185,8 +205,9 @@ const translations = {
     howAreYou: "你今天感觉如何？",
     updateStatus: "更新状态以获得更好的结果。",
     scanProduct: "扫描产品",
-    scanPrompt: "对准标签",
-    foodOrSkincare: "(食品或化妆品)",
+    scanPrompt: "请将相机对准",
+    scanAnyLabel: "任何标签",
+    scanFoodSkincare: "(食品或护肤品)",
     recentHistory: "最近历史",
     viewAll: "查看全部",
     routine: "我的常规",
@@ -211,7 +232,11 @@ const translations = {
     favorites: "收藏",
     recent: "最近",
     noFavorites: "尚无收藏内容。",
-    noScans: "开始扫描以查看您的历史记录。"
+    noScans: "开始扫描以查看您的历史记录。",
+    scanFace: "扫描您的脸部",
+    scanEat: "扫描您的食物",
+    yourFavorites: "您的收藏",
+    favoritesUserScan: "用户扫描收藏"
   }
 };
 
@@ -249,7 +274,6 @@ const App: React.FC = () => {
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showHistoryDetail, setShowHistoryDetail] = useState(false);
   const [historyCategory, setHistoryCategory] = useState<'recent' | 'favorites'>('recent');
-  // Flag to track if the current modal content is from a fresh scan or history
   const [isModalFromHistory, setIsModalFromHistory] = useState(false);
 
   const currentLang = user?.language || AppLanguage.EN;
@@ -386,7 +410,7 @@ const App: React.FC = () => {
     setView(ViewState.HOME); 
     setIsScanning(true);
     setScanResult(null); 
-    setIsModalFromHistory(false); // Modal comes from fresh scan
+    setIsModalFromHistory(false);
     if (!user || !userId) return;
     const rawBase64 = imageSrc.split(',')[1];
     try {
@@ -441,6 +465,8 @@ const App: React.FC = () => {
   const filteredHistory = historyCategory === 'recent' 
     ? scanHistory 
     : scanHistory.filter(item => item.isFavorite);
+
+  const userFavorites = scanHistory.filter(item => item.isFavorite);
 
   if (loadingApp) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -500,18 +526,123 @@ const App: React.FC = () => {
                 </div>
              </Card>
 
-             <div className="mb-8" onClick={handleScanAction}>
-                <Card variant="standard" className="p-2 flex items-center gap-4 cursor-pointer !border-none !shadow-[0_10px_30px_rgba(111,174,154,0.15)] group">
-                    <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-[#6FAE9A] to-[#428070] flex items-center justify-center text-white shadow-lg shadow-[#6FAE9A]/30">
-                        <Scan size={36} className="group-hover:scale-110 transition-transform" />
+             {/* Large Scan Product Card as per image */}
+             <div className="mb-6" onClick={handleScanAction}>
+                <Card variant="standard" className="p-5 flex items-center gap-5 cursor-pointer !border-none !shadow-[0_10px_30px_rgba(0,0,0,0.05)] group bg-white">
+                    <div className="w-20 h-20 rounded-2xl bg-[#6FAE9A] flex items-center justify-center text-white shadow-lg shadow-[#6FAE9A]/20 flex-shrink-0">
+                        <div className="relative w-10 h-10 border-2 border-white/40 rounded-xl flex items-center justify-center overflow-hidden">
+                            <div className="absolute inset-0 border-2 border-white rounded-lg"></div>
+                            <Scan size={24} strokeWidth={2.5} />
+                        </div>
                     </div>
-                    <div className="flex-1 py-2 pr-4">
-                        <h3 className="font-bold text-lg text-[#1C1C1C] mb-1">{t.scanProduct}</h3>
-                        <p className="text-xs text-gray-500 font-medium leading-relaxed">{t.scanPrompt} <br/><span className="text-[#6FAE9A] font-bold">{t.foodOrSkincare}</span></p>
+                    <div className="flex-1">
+                        <h3 className="font-bold text-2xl text-[#1C1C1C] leading-none mb-2">{t.scanProduct}</h3>
+                        <div className="text-sm font-medium text-gray-500 space-y-0.5">
+                            <p>{t.scanPrompt} <span className="font-bold">{t.scanAnyLabel}</span></p>
+                            <p className="text-[#6FAE9A] font-bold">{t.scanFoodSkincare}</p>
+                        </div>
                     </div>
-                    <ChevronRight size={24} className="mr-4 text-gray-300" />
+                    <ChevronRight size={24} className="text-gray-300" />
                 </Card>
              </div>
+
+             {/* Specialized Scan Grid */}
+             <div className="grid grid-cols-2 gap-4 mb-8">
+                {/* Skincare - Pink */}
+                <div 
+                    onClick={handleScanAction}
+                    className="relative h-44 rounded-3xl overflow-hidden cursor-pointer group active:scale-95 transition-all shadow-[0_10px_25px_rgba(251,207,232,0.3)] bg-gradient-to-br from-pink-400 to-rose-500 border border-white/20"
+                >
+                    <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md p-2 rounded-xl text-white">
+                        <Smile size={20} />
+                    </div>
+                    <div className="absolute bottom-4 left-4 right-4">
+                        <p className="text-white font-black text-lg leading-tight mb-1">{t.scanFace}</p>
+                        <div className="h-1 w-8 bg-white/40 rounded-full"></div>
+                    </div>
+                    <div className="absolute -right-6 -bottom-6 opacity-20 transform -rotate-12 group-hover:scale-110 transition-transform">
+                        <Smile size={100} className="text-white" />
+                    </div>
+                </div>
+
+                {/* Food - Yellow */}
+                <div 
+                    onClick={handleScanAction}
+                    className="relative h-44 rounded-3xl overflow-hidden cursor-pointer group active:scale-95 transition-all shadow-[0_10px_25px_rgba(255,210,0,0.3)] bg-gradient-to-br from-[#FFD200] to-[#F7931E] border border-white/20"
+                >
+                    <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md p-2 rounded-xl text-white">
+                        <Utensils size={20} />
+                    </div>
+                    <div className="absolute bottom-4 left-4 right-4">
+                        <p className="text-white font-black text-lg leading-tight mb-1">{t.scanEat}</p>
+                        <div className="h-1 w-8 bg-white/40 rounded-full"></div>
+                    </div>
+                    <div className="absolute -right-6 -bottom-6 opacity-20 transform -rotate-12 group-hover:scale-110 transition-transform">
+                        <Utensils size={100} className="text-white" />
+                    </div>
+                </div>
+             </div>
+
+             {/* Your Favorites Horizontal Scroll */}
+             {userFavorites.length > 0 && (
+                 <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="flex items-center justify-between mb-4 px-1">
+                        <div className="flex items-center gap-2">
+                            <Heart size={18} className="text-rose-500 fill-rose-500" />
+                            <h3 className="font-bold text-lg text-[#1C1C1C]">{t.yourFavorites}</h3>
+                        </div>
+                    </div>
+                    
+                    <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 -mx-6 px-6">
+                        {userFavorites.map((item) => (
+                            <div 
+                                key={item.id} 
+                                onClick={() => { setScanResult(item); setIsModalFromHistory(true); }}
+                                className="w-32 flex-shrink-0 bg-white/70 backdrop-blur-md border border-white/60 p-3 rounded-2xl shadow-sm hover:shadow-md transition-all active:scale-95"
+                            >
+                                <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-xl mb-3">
+                                    {renderIcon(item.icon)}
+                                </div>
+                                <p className="text-[11px] font-bold text-gray-800 line-clamp-1 mb-1">{item.productName}</p>
+                                <div className="flex items-center justify-between">
+                                    <span className={`w-1.5 h-1.5 rounded-full ${item.status === ScanStatus.SAFE ? 'bg-green-500' : item.status === ScanStatus.AVOID ? 'bg-red-500' : 'bg-yellow-500'}`}></span>
+                                    <span className="text-[9px] font-bold text-gray-400">{item.score}%</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                 </div>
+             )}
+
+             {/* New "Favourites user scan" Vertical Section at Bottom */}
+             {userFavorites.length > 0 && (
+                 <div className="mt-4 pt-4 border-t border-gray-100">
+                    <h3 className="font-bold text-xl text-[#1C1C1C] mb-4 px-1">{t.favoritesUserScan}</h3>
+                    <div className="space-y-4">
+                        {userFavorites.map((item) => (
+                             <div 
+                                key={item.id} 
+                                onClick={() => { setScanResult(item); setIsModalFromHistory(true); }}
+                                className="flex items-center justify-between p-4 bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/50 cursor-pointer group"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-2xl group-hover:scale-105 transition-transform">
+                                        {renderIcon(item.icon)}
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-gray-800 text-sm line-clamp-1">{item.productName}</p>
+                                        <p className="text-[10px] text-gray-400 font-medium uppercase">{item.category} • {formatTimeAgo(item.timestamp)}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <Star size={18} fill="#FFD200" className="text-[#FFD200]" />
+                                    <span className={`w-2.5 h-2.5 rounded-full ${item.status === ScanStatus.SAFE ? 'bg-green-500' : item.status === ScanStatus.AVOID ? 'bg-red-500' : 'bg-yellow-500'}`}></span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                 </div>
+             )}
           </div>
         </div>
       )}
@@ -547,17 +678,17 @@ const App: React.FC = () => {
                         </div>
                     </Card>
 
-                    <Card variant="standard" className="p-1 flex flex-col cursor-pointer hover:border-[#6FAE9A]/40 transition-all shadow-lg shadow-[#6FAE9A]/5 border border-white/80 group">
+                    <Card variant="standard" className="p-1 flex flex-col cursor-pointer hover:border-pink-200 transition-all shadow-lg shadow-pink-500/5 border border-white/80 group">
                         <div className="p-6 flex items-center gap-5">
-                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#6FAE9A]/20 to-[#6FAE9A]/10 flex items-center justify-center text-[#6FAE9A] group-hover:scale-105 transition-transform duration-500">
-                                <Droplet size={32} />
+                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-400/20 to-pink-400/10 flex items-center justify-center text-pink-500 group-hover:scale-105 transition-transform duration-500">
+                                <Smile size={32} />
                             </div>
                             <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
                                     <h3 className="font-bold text-xl text-[#1C1C1C]">{t.skincareRoutine}</h3>
-                                    <div className="flex items-center gap-1 px-2 py-0.5 bg-[#6FAE9A]/10 rounded-full">
-                                        <Zap size={10} className="text-[#6FAE9A] fill-[#6FAE9A]" />
-                                        <span className="text-[9px] font-bold text-[#6FAE9A] uppercase tracking-tighter">AI Ready</span>
+                                    <div className="flex items-center gap-1 px-2 py-0.5 bg-pink-500/10 rounded-full">
+                                        <Zap size={10} className="text-pink-500 fill-pink-500" />
+                                        <span className="text-[9px] font-bold text-pink-500 uppercase tracking-tighter">AI Ready</span>
                                     </div>
                                 </div>
                                 <p className="text-xs text-gray-400 font-medium">{t.aiSync}</p>
@@ -566,17 +697,17 @@ const App: React.FC = () => {
                         </div>
                     </Card>
 
-                    <Card variant="standard" className="p-1 flex flex-col cursor-pointer hover:border-[#6FAE9A]/40 transition-all shadow-lg shadow-[#6FAE9A]/5 border border-white/80 group">
+                    <Card variant="standard" className="p-1 flex flex-col cursor-pointer hover:border-amber-200 transition-all shadow-lg shadow-amber-500/5 border border-white/80 group">
                         <div className="p-6 flex items-center gap-5">
-                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#FF9F1C]/20 to-[#FF9F1C]/10 flex items-center justify-center text-[#FF9F1C] group-hover:scale-105 transition-transform duration-500">
+                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#FFD200]/20 to-[#FFD200]/10 flex items-center justify-center text-amber-500 group-hover:scale-105 transition-transform duration-500">
                                 <Utensils size={32} />
                             </div>
                             <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
                                     <h3 className="font-bold text-xl text-[#1C1C1C]">{t.foodTracking}</h3>
-                                    <div className="flex items-center gap-1 px-2 py-0.5 bg-[#FF9F1C]/10 rounded-full">
-                                        <Zap size={10} className="text-[#FF9F1C] fill-[#FF9F1C]" />
-                                        <span className="text-[9px] font-bold text-[#FF9F1C] uppercase tracking-tighter">AI Ready</span>
+                                    <div className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 rounded-full">
+                                        <Zap size={10} className="text-amber-500 fill-amber-500" />
+                                        <span className="text-[9px] font-bold text-amber-500 uppercase tracking-tighter">AI Ready</span>
                                     </div>
                                 </div>
                                 <p className="text-xs text-gray-400 font-medium">{t.aiSync}</p>
@@ -666,7 +797,6 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="space-y-6">
-                    {/* Health Condition Card with Additional Details */}
                     <Card variant="standard" className="p-5">
                         <div className="flex justify-between items-center mb-4">
                             <p className="text-xs text-gray-400 font-bold uppercase">{t.healthCondition}</p>
@@ -692,7 +822,6 @@ const App: React.FC = () => {
                         )}
                     </Card>
 
-                    {/* Change Profile Button directly under Health Condition */}
                     <Button variant="secondary" fullWidth onClick={() => setView(ViewState.ONBOARDING)} className="mb-8">
                         {t.changeProfile}
                     </Button>
@@ -723,7 +852,6 @@ const App: React.FC = () => {
          </div>
       )}
 
-      {/* Language Selection Modal */}
       {showLanguageModal && (
         <div className="fixed inset-0 z-[60] bg-white animate-in slide-in-from-bottom-10 flex flex-col no-scrollbar">
             <div className="p-6 pt-12 flex items-center justify-between border-b border-gray-100 bg-white/80 backdrop-blur-md sticky top-0 z-10">
