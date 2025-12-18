@@ -337,9 +337,7 @@ const App: React.FC = () => {
   useEffect(() => {
     checkApiKey();
     const interval = setInterval(() => {
-        const apiKey = process.env.API_KEY;
-        const envKeyAvailable = typeof apiKey === 'string' && apiKey !== "" && apiKey !== "undefined" && apiKey !== "null";
-        if (!envKeyAvailable) checkApiKey();
+        checkApiKey();
     }, 5000);
 
     let mounted = true;
@@ -381,12 +379,12 @@ const App: React.FC = () => {
         if (profile) {
           setUser(profile);
           setView(ViewState.HOME);
-          setActiveTab('Home'); // Ensure user goes to Home tab after sign-in
+          setActiveTab('Home'); 
           const history = await getScanHistory(session.user.id);
           setScanHistory(history);
         } else {
           setView(ViewState.ONBOARDING);
-          setActiveTab('Home'); // Default tab to Home even for new users after onboarding
+          setActiveTab('Home');
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
@@ -503,9 +501,7 @@ const App: React.FC = () => {
   };
 
   const userFavorites = scanHistory.filter(item => item.isFavorite);
-  // Get favorites for the home screen horizontal scroll (max 9)
   const homeFavorites = userFavorites.slice(0, 9);
-  // Sort history for ranking (100 to 0)
   const rankedScans = [...scanHistory].sort((a, b) => b.score - a.score);
   
   const currentConditionLabel = user?.customConditionName || user?.condition || "General Health";
@@ -520,7 +516,6 @@ const App: React.FC = () => {
   if (view === ViewState.ONBOARDING) return <Suspense fallback={<LoadingSpinner />}><Onboarding onComplete={(p) => { updateUserProfile(userId!, p); setUser(p); setView(ViewState.HOME); setActiveTab('Home'); }} /></Suspense>;
   if (view === ViewState.SCANNER) return <Suspense fallback={<LoadingSpinner />}><Scanner onCapture={handleScanCapture} onClose={() => setView(ViewState.HOME)} /></Suspense>;
 
-  // FULL-SCREEN RANKING VIEW
   if (view === ViewState.RANKING) {
     return (
       <div className={`min-h-screen bg-[#F0FDF9] pb-10 animate-in slide-in-from-right-10 duration-500 ${isRTL ? 'rtl' : 'ltr'}`} dir={isRTL ? 'rtl' : 'ltr'}>
@@ -635,10 +630,8 @@ const App: React.FC = () => {
                 </div>
              </Card>
 
-             {/* HERO SCAN PRODUCT CARD - MATCHING IMAGE */}
              <div className="mb-8" onClick={handleScanAction}>
                 <div className="bg-white rounded-3xl p-6 flex items-center gap-6 cursor-pointer shadow-[0_15px_40px_rgba(0,0,0,0.04)] border border-gray-50 active:scale-95 transition-all">
-                    {/* Brand Green Focused Icon */}
                     <div className="w-24 h-24 rounded-3xl bg-[#6FAE9A] flex items-center justify-center text-white shadow-xl shadow-[#6FAE9A]/10 flex-shrink-0">
                         <div className="w-10 h-10 border-2 border-white/50 rounded-xl flex items-center justify-center p-1.5 relative">
                             <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-white"></div>
@@ -661,9 +654,7 @@ const App: React.FC = () => {
                 </div>
              </div>
 
-             {/* Specialized Scan Grid */}
              <div className="grid grid-cols-2 gap-4 mb-10">
-                {/* Skincare - Pink */}
                 <div 
                     onClick={handleScanAction}
                     className="relative h-44 rounded-3xl overflow-hidden cursor-pointer group active:scale-95 transition-all shadow-[0_10px_25px_rgba(251,207,232,0.3)] bg-gradient-to-br from-pink-400 to-rose-500 border border-white/20"
@@ -680,7 +671,6 @@ const App: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Food - Yellow */}
                 <div 
                     onClick={handleScanAction}
                     className="relative h-44 rounded-3xl overflow-hidden cursor-pointer group active:scale-95 transition-all shadow-[0_10px_25px_rgba(255,210,0,0.3)] bg-gradient-to-br from-[#FFD200] to-[#F7931E] border border-white/20"
@@ -698,7 +688,6 @@ const App: React.FC = () => {
                 </div>
              </div>
 
-             {/* FAVOURITES USER SCAN - HORIZONTAL SCROLL 9 CARDS */}
              {homeFavorites.length > 0 && (
                  <div className="mt-2 pt-4 border-t border-gray-200/40 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="flex items-center justify-between mb-6 px-1">
@@ -779,7 +768,6 @@ const App: React.FC = () => {
                         </div>
                     </Card>
 
-                    {/* Skincare Routine Card - Pink Theme */}
                     <Card variant="standard" className="p-1 flex flex-col cursor-pointer hover:border-pink-200 transition-all shadow-lg shadow-pink-500/5 border border-white/80 group">
                         <div className="p-6 flex items-center gap-5">
                             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-400/20 to-pink-400/10 flex items-center justify-center text-pink-500 group-hover:scale-105 transition-transform duration-500">
@@ -799,7 +787,6 @@ const App: React.FC = () => {
                         </div>
                     </Card>
 
-                    {/* Food Tracking Card - Yellow/Amber Theme */}
                     <Card variant="standard" className="p-1 flex flex-col cursor-pointer hover:border-amber-200 transition-all shadow-lg shadow-amber-500/5 border border-white/80 group">
                         <div className="p-6 flex items-center gap-5">
                             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#FFD200]/20 to-[#FFD200]/10 flex items-center justify-center text-amber-500 group-hover:scale-105 transition-transform duration-500">
