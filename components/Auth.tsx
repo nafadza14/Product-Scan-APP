@@ -56,7 +56,6 @@ const Auth: React.FC<AuthProps> = ({ onCancel }) => {
     setLoading(true);
     setErrorMessage(null);
     try {
-      // Menggunakan origin yang tepat untuk redirect
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -129,7 +128,7 @@ const Auth: React.FC<AuthProps> = ({ onCancel }) => {
                     {showOAuthHelp && (
                         <div className="mt-3 p-3 bg-white/50 rounded-xl text-[10px] text-red-800 space-y-2 border border-red-200">
                             <p><strong>Penyebab:</strong> Proyek Google Anda mungkin masih dalam status "Testing".</p>
-                            <p><strong>Solusi:</strong> Di Google Cloud Console > OAuth Consent Screen, klik <strong>"Publish App"</strong> agar statusnya menjadi "In Production", atau tambahkan email Anda ke daftar <strong>"Test Users"</strong>.</p>
+                            <p><strong>Solusi:</strong> Di Google Cloud Console &gt; OAuth Consent Screen, klik <strong>"Publish App"</strong> agar statusnya menjadi "In Production", atau tambahkan email Anda ke daftar <strong>"Test Users"</strong>.</p>
                         </div>
                     )}
                 </div>

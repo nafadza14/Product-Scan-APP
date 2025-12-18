@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { ViewState, UserProfile, ScanResult, ScanHistoryItem, ScanStatus, AppLanguage } from './types';
 import { Home, Scan, Compass, User, ClipboardList, Sparkles, ChevronRight, Activity, Package, Key, AlertCircle, Globe, Droplet, Utensils, Zap, History, Check, X, Star, ChevronLeft, Heart, Smile } from 'lucide-react';
@@ -462,10 +461,6 @@ const App: React.FC = () => {
     </button>
   );
 
-  const filteredHistory = historyCategory === 'recent' 
-    ? scanHistory 
-    : scanHistory.filter(item => item.isFavorite);
-
   const userFavorites = scanHistory.filter(item => item.isFavorite);
 
   if (loadingApp) return (
@@ -526,28 +521,34 @@ const App: React.FC = () => {
                 </div>
              </Card>
 
-             {/* Large Scan Product Card as per image */}
-             <div className="mb-6" onClick={handleScanAction}>
-                <Card variant="standard" className="p-5 flex items-center gap-5 cursor-pointer !border-none !shadow-[0_10px_30px_rgba(0,0,0,0.05)] group bg-white">
-                    <div className="w-20 h-20 rounded-2xl bg-[#6FAE9A] flex items-center justify-center text-white shadow-lg shadow-[#6FAE9A]/20 flex-shrink-0">
-                        <div className="relative w-10 h-10 border-2 border-white/40 rounded-xl flex items-center justify-center overflow-hidden">
-                            <div className="absolute inset-0 border-2 border-white rounded-lg"></div>
+             {/* HERO SCAN PRODUCT CARD - MATCHING IMAGE */}
+             <div className="mb-8" onClick={handleScanAction}>
+                <div className="bg-white rounded-3xl p-6 flex items-center gap-6 cursor-pointer shadow-[0_15px_40px_rgba(0,0,0,0.04)] border border-gray-50 active:scale-95 transition-all">
+                    {/* Brand Green Focused Icon */}
+                    <div className="w-24 h-24 rounded-3xl bg-[#6FAE9A] flex items-center justify-center text-white shadow-xl shadow-[#6FAE9A]/10 flex-shrink-0">
+                        <div className="w-10 h-10 border-2 border-white/50 rounded-xl flex items-center justify-center p-1.5 relative">
+                            <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-white"></div>
+                            <div className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-white"></div>
+                            <div className="absolute -bottom-1 -left-1 w-2 h-2 border-b-2 border-l-2 border-white"></div>
+                            <div className="absolute -bottom-1 -right-1 w-2 h-2 border-b-2 border-r-2 border-white"></div>
                             <Scan size={24} strokeWidth={2.5} />
                         </div>
                     </div>
+                    
                     <div className="flex-1">
-                        <h3 className="font-bold text-2xl text-[#1C1C1C] leading-none mb-2">{t.scanProduct}</h3>
-                        <div className="text-sm font-medium text-gray-500 space-y-0.5">
-                            <p>{t.scanPrompt} <span className="font-bold">{t.scanAnyLabel}</span></p>
-                            <p className="text-[#6FAE9A] font-bold">{t.scanFoodSkincare}</p>
+                        <h3 className="text-2xl font-black text-[#1C1C1C] mb-1">{t.scanProduct}</h3>
+                        <div className="space-y-0.5">
+                            <p className="text-sm font-medium text-gray-500">{t.scanPrompt} <span className="font-bold">{t.scanAnyLabel}</span></p>
+                            <p className="text-sm font-bold text-[#6FAE9A]">{t.scanFoodSkincare}</p>
                         </div>
                     </div>
+                    
                     <ChevronRight size={24} className="text-gray-300" />
-                </Card>
+                </div>
              </div>
 
              {/* Specialized Scan Grid */}
-             <div className="grid grid-cols-2 gap-4 mb-8">
+             <div className="grid grid-cols-2 gap-4 mb-10">
                 {/* Skincare - Pink */}
                 <div 
                     onClick={handleScanAction}
@@ -583,7 +584,7 @@ const App: React.FC = () => {
                 </div>
              </div>
 
-             {/* Your Favorites Horizontal Scroll */}
+             {/* YOUR FAVORITES HORIZONTAL SCROLL */}
              {userFavorites.length > 0 && (
                  <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="flex items-center justify-between mb-4 px-1">
@@ -614,29 +615,35 @@ const App: React.FC = () => {
                  </div>
              )}
 
-             {/* New "Favourites user scan" Vertical Section at Bottom */}
+             {/* VERTICAL FAVORITES LIST AT BOTTOM */}
              {userFavorites.length > 0 && (
-                 <div className="mt-4 pt-4 border-t border-gray-100">
-                    <h3 className="font-bold text-xl text-[#1C1C1C] mb-4 px-1">{t.favoritesUserScan}</h3>
+                 <div className="mt-4 pt-8 border-t border-gray-200/50">
+                    <div className="flex items-center justify-between mb-6 px-1">
+                        <h3 className="font-black text-2xl text-[#1C1C1C]">{t.favoritesUserScan}</h3>
+                    </div>
                     <div className="space-y-4">
                         {userFavorites.map((item) => (
                              <div 
                                 key={item.id} 
                                 onClick={() => { setScanResult(item); setIsModalFromHistory(true); }}
-                                className="flex items-center justify-between p-4 bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/50 cursor-pointer group"
+                                className="flex items-center justify-between p-4 bg-white/80 backdrop-blur-sm rounded-[2rem] shadow-sm border border-white/50 cursor-pointer group hover:shadow-md transition-all"
                             >
                                 <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-2xl group-hover:scale-105 transition-transform">
+                                    <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-2xl group-hover:scale-105 transition-transform">
                                         {renderIcon(item.icon)}
                                     </div>
                                     <div>
                                         <p className="font-bold text-gray-800 text-sm line-clamp-1">{item.productName}</p>
-                                        <p className="text-[10px] text-gray-400 font-medium uppercase">{item.category} • {formatTimeAgo(item.timestamp)}</p>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">{item.category}</span>
+                                            <span className="w-1 h-1 rounded-full bg-gray-200"></span>
+                                            <span className="text-[10px] text-gray-400 font-medium uppercase">{formatTimeAgo(item.timestamp)}</span>
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <Star size={18} fill="#FFD200" className="text-[#FFD200]" />
-                                    <span className={`w-2.5 h-2.5 rounded-full ${item.status === ScanStatus.SAFE ? 'bg-green-500' : item.status === ScanStatus.AVOID ? 'bg-red-500' : 'bg-yellow-500'}`}></span>
+                                    <Star size={20} fill="#FFD200" className="text-[#FFD200]" />
+                                    <div className={`w-3 h-3 rounded-full ${item.status === ScanStatus.SAFE ? 'bg-green-500' : item.status === ScanStatus.AVOID ? 'bg-red-500' : 'bg-yellow-500'}`}></div>
                                 </div>
                             </div>
                         ))}
@@ -678,6 +685,7 @@ const App: React.FC = () => {
                         </div>
                     </Card>
 
+                    {/* Skincare Routine Card - Pink Theme */}
                     <Card variant="standard" className="p-1 flex flex-col cursor-pointer hover:border-pink-200 transition-all shadow-lg shadow-pink-500/5 border border-white/80 group">
                         <div className="p-6 flex items-center gap-5">
                             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-400/20 to-pink-400/10 flex items-center justify-center text-pink-500 group-hover:scale-105 transition-transform duration-500">
@@ -697,6 +705,7 @@ const App: React.FC = () => {
                         </div>
                     </Card>
 
+                    {/* Food Tracking Card - Yellow/Amber Theme */}
                     <Card variant="standard" className="p-1 flex flex-col cursor-pointer hover:border-amber-200 transition-all shadow-lg shadow-amber-500/5 border border-white/80 group">
                         <div className="p-6 flex items-center gap-5">
                             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#FFD200]/20 to-[#FFD200]/10 flex items-center justify-center text-amber-500 group-hover:scale-105 transition-transform duration-500">
@@ -750,7 +759,7 @@ const App: React.FC = () => {
                     </div>
 
                     <div className="space-y-4">
-                        {filteredHistory.length > 0 ? filteredHistory.map(item => (
+                        {scanHistory.filter(item => historyCategory === 'recent' || item.isFavorite).length > 0 ? scanHistory.filter(item => historyCategory === 'recent' || item.isFavorite).map(item => (
                              <div key={item.id} className="flex items-center justify-between p-4 bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/50 cursor-pointer group" onClick={() => { setScanResult(item); setIsModalFromHistory(true); }}>
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-2xl group-hover:scale-105 transition-transform">{renderIcon(item.icon)}</div>
