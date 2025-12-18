@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import Button from './Button';
 import Card from './Card';
-import { ShieldCheck, AlertCircle, Mail, Lock, User, Eye, EyeOff, X, HelpCircle } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Mail, Lock, User, Eye, EyeOff, X, HelpCircle, Copy, Check } from 'lucide-react';
 
 interface AuthProps {
     onCancel?: () => void;
@@ -15,11 +15,21 @@ const Auth: React.FC<AuthProps> = ({ onCancel }) => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showOAuthHelp, setShowOAuthHelp] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Form State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+
+  // Calculate the exact redirect URL we are using
+  const getRedirectUrl = () => {
+    let origin = window.location.origin;
+    if (!origin.startsWith('http')) {
+      origin = `https://${origin}`;
+    }
+    return origin.endsWith('/') ? origin : `${origin}/`;
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,6 +45,7 @@ const Auth: React.FC<AuthProps> = ({ onCancel }) => {
             data: {
               full_name: fullName,
             },
+            emailRedirectTo: getRedirectUrl(),
           },
         });
         if (error) throw error;
@@ -57,10 +68,8 @@ const Auth: React.FC<AuthProps> = ({ onCancel }) => {
     setLoading(true);
     setErrorMessage(null);
     try {
-      // Ensure the redirect points exactly to the current base URL
-      const redirectTo = window.location.origin.endsWith('/') 
-        ? window.location.origin 
-        : `${window.location.origin}/`;
+      const redirectTo = getRedirectUrl();
+      console.log("Attempting Google Auth with Redirect:", redirectTo);
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -75,9 +84,19 @@ const Auth: React.FC<AuthProps> = ({ onCancel }) => {
       if (error) throw error;
     } catch (error: any) {
       console.error("Google Auth Error:", error);
-      setErrorMessage("Gagal masuk dengan Google. Pastikan URL Situs di Supabase Dashboard sudah diatur ke URL Vercel Anda.");
+      // If we see the specific path error, trigger the help immediately
+      if (error.message?.includes('invalid') || error.message?.includes('path')) {
+          setShowOAuthHelp(true);
+      }
+      setErrorMessage("Supabase menolak permintaan redirect. Cek pengaturan dashboard Anda.");
       setLoading(false);
     }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(getRedirectUrl());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -119,22 +138,42 @@ const Auth: React.FC<AuthProps> = ({ onCancel }) => {
 
         <Card variant="glass" className="backdrop-blur-xl">
             {errorMessage && (
-                <div className="mb-6 p-4 bg-red-50/80 border border-red-100 rounded-2xl">
+                <div className="mb-6 p-4 bg-red-50/90 border border-red-100 rounded-2xl">
                     <div className="flex items-start gap-3 mb-2">
                         <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={18} />
                         <p className="text-xs font-semibold text-red-600 leading-snug">{errorMessage}</p>
                     </div>
+                    
                     <button 
                         onClick={() => setShowOAuthHelp(!showOAuthHelp)}
-                        className="text-[10px] font-bold text-red-700 underline flex items-center gap-1"
+                        className="text-[10px] font-bold text-red-700 underline flex items-center gap-1 mt-1"
                     >
-                        <HelpCircle size={10} /> Masalah Redirect?
+                        <HelpCircle size={10} /> Cara perbaiki Error Redirect
                     </button>
                     
                     {showOAuthHelp && (
-                        <div className="mt-3 p-3 bg-white/50 rounded-xl text-[10px] text-red-800 space-y-2 border border-red-200">
-                            <p><strong>Penyebab:</strong> Supabase mencoba mengirim Anda kembali ke localhost.</p>
-                            <p><strong>Solusi:</strong> Buka Supabase Dashboard &gt; Auth &gt; URL Configuration. Ubah <strong>Site URL</strong> menjadi URL Vercel Anda (misal: <code>https://app.vercel.app</code>).</p>
+                        <div className="mt-4 p-4 bg-white/80 rounded-xl text-[10px] text-gray-700 space-y-3 border border-red-200 shadow-sm animate-in fade-in slide-in-from-top-2">
+                            <p className="font-bold text-red-600">PENTING: Salin URL di bawah ini ke Supabase Dashboard:</p>
+                            
+                            <div className="flex items-center gap-2 p-2 bg-gray-100 rounded-lg border border-gray-200 group">
+                                <code className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[9px] text-gray-600">
+                                    {getRedirectUrl()}
+                                </code>
+                                <button 
+                                    onClick={copyToClipboard}
+                                    className="p-1.5 hover:bg-white rounded-md transition-colors text-gray-400 hover:text-[#6FAE9A]"
+                                    title="Copy to clipboard"
+                                >
+                                    {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+                                </button>
+                            </div>
+
+                            <ol className="list-decimal pl-4 space-y-1 text-gray-500">
+                                <li>Buka <strong>Supabase Dashboard</strong></li>
+                                <li>Pilih <strong>Authentication</strong> &gt; <strong>URL Configuration</strong></li>
+                                <li>Paste URL di atas ke <strong>Site URL</strong></li>
+                                <li>Klik <strong>Save</strong> dan coba lagi.</li>
+                            </ol>
                         </div>
                     )}
                 </div>

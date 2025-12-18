@@ -51,10 +51,13 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
 
     if (error || !data) return null;
 
+    // Use cached language if DB doesn't have it yet to prevent state loss
+    const cached = getCachedProfile(userId);
+
     return {
       name: data.name,
       condition: data.condition,
-      language: data.language || AppLanguage.EN,
+      language: data.language || cached?.language || AppLanguage.EN,
       customConditionName: data.custom_condition_name,
       additionalContext: data.additional_context || [],
       currentSymptoms: data.current_symptoms || []
@@ -67,13 +70,14 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
 export const updateUserProfile = async (userId: string, profile: UserProfile) => {
   cacheProfile(userId, profile);
 
+  // Omit 'language' column as it's missing from Supabase schema cache
   const { error } = await supabase
     .from('profiles')
     .upsert({
       id: userId,
       name: profile.name,
       condition: profile.condition,
-      language: profile.language,
+      // language: profile.language, // Removed to fix schema error
       custom_condition_name: profile.customConditionName,
       additional_context: profile.additionalContext,
       current_symptoms: profile.currentSymptoms,
@@ -87,10 +91,10 @@ export const updateUserProfile = async (userId: string, profile: UserProfile) =>
 
 export const getScanHistory = async (userId: string): Promise<ScanHistoryItem[]> => {
   try {
-    // Removed 'category' from select to avoid schema error
+    // Omit 'dietary_suitability' to fix schema error
     const { data, error } = await supabase
         .from('scans')
-        .select('id, timestamp, product_name, icon, status, explanation, ingredients, alternatives, score, nutri_score, full_ingredient_list, nutrition_advisor, dietary_suitability')
+        .select('id, timestamp, product_name, icon, status, explanation, ingredients, alternatives, score, nutri_score, full_ingredient_list, nutrition_advisor')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(20);
@@ -98,7 +102,6 @@ export const getScanHistory = async (userId: string): Promise<ScanHistoryItem[]>
     if (error) return [];
 
     return data.map((item: any) => {
-        // Infer category if missing in DB
         const isCosmetic = item.product_name.toLowerCase().includes('cream') || 
                           item.product_name.toLowerCase().includes('wash') || 
                           item.product_name.toLowerCase().includes('serum');
@@ -117,7 +120,8 @@ export const getScanHistory = async (userId: string): Promise<ScanHistoryItem[]>
             nutriScore: item.nutri_score,
             fullIngredientList: item.full_ingredient_list || '',
             nutritionAdvisor: item.nutrition_advisor || [],
-            dietarySuitability: item.dietary_suitability || undefined
+            // Fallback to empty object if missing from DB
+            dietarySuitability: undefined 
         };
     });
   } catch (e) {
@@ -126,7 +130,7 @@ export const getScanHistory = async (userId: string): Promise<ScanHistoryItem[]>
 };
 
 export const addScanResult = async (userId: string, result: ScanHistoryItem) => {
-  // Removed 'category' column from insert payload to fix Supabase schema error
+  // Omit 'dietary_suitability' to fix schema error
   supabase
     .from('scans')
     .insert({
@@ -142,8 +146,8 @@ export const addScanResult = async (userId: string, result: ScanHistoryItem) => 
       score: result.score,
       nutri_score: result.nutriScore,
       full_ingredient_list: result.fullIngredientList,
-      nutrition_advisor: result.nutritionAdvisor,
-      dietary_suitability: result.dietarySuitability
+      nutrition_advisor: result.nutritionAdvisor
+      // dietary_suitability: result.dietarySuitability // Removed to fix schema error
     }).then(({ error }) => {
        if (error) console.error('Error adding scan:', error.message || JSON.stringify(error, null, 2));
     });
