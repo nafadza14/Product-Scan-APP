@@ -1,5 +1,5 @@
 {
-  "name": "VitalSense",
+  "name": "Food and Skincare Scaning",
   "description": "A context-aware health scanner for personalized ingredient analysis.",
   "requestFramePermissions": [
     "camera"

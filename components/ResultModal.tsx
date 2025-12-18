@@ -1,13 +1,16 @@
-import React from 'react';
-import { ScanResult, ScanStatus, MacroNutrient } from '../types';
-import { CheckCircle2, X, AlertTriangle, Ban, Info, Leaf, Wheat, Milk, Check, Droplet, Candy, Dumbbell, Flame, Package } from 'lucide-react';
+
+import React, { useState } from 'react';
+import { ScanHistoryItem, ScanStatus, MacroNutrient } from '../types';
+import { CheckCircle2, X, AlertTriangle, Ban, Info, Leaf, Wheat, Milk, Check, Droplet, Candy, Dumbbell, Flame, Package, Star } from 'lucide-react';
 import Button from './Button';
 import Card from './Card';
 
 interface ResultModalProps {
-  result: ScanResult | null;
+  result: ScanHistoryItem | null;
   onClose: () => void;
   isLoading: boolean;
+  isHistoryView?: boolean;
+  onToggleFavorite?: (id: string) => void;
 }
 
 // Helper to get color based on score
@@ -184,7 +187,9 @@ const NutritionAdvisorRow: React.FC<{ item: MacroNutrient }> = ({ item }) => {
     );
 };
 
-const ResultModal: React.FC<ResultModalProps> = ({ result, onClose, isLoading }) => {
+const ResultModal: React.FC<ResultModalProps> = ({ result, onClose, isLoading, isHistoryView = false, onToggleFavorite }) => {
+  const [isFavorited, setIsFavorited] = useState(result?.isFavorite || false);
+
   if (isLoading) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
@@ -205,6 +210,13 @@ const ResultModal: React.FC<ResultModalProps> = ({ result, onClose, isLoading })
   const renderIcon = (iconStr?: string) => {
     if (!iconStr || iconStr.length > 4) return <Package size={48} className="text-[#6FAE9A]" />;
     return iconStr;
+  };
+
+  const handleFavoriteClick = () => {
+    if (onToggleFavorite && result.id) {
+        onToggleFavorite(result.id);
+        setIsFavorited(!isFavorited);
+    }
   };
 
   return (
@@ -347,7 +359,7 @@ const ResultModal: React.FC<ResultModalProps> = ({ result, onClose, isLoading })
 
             {/* 4. Better Alternatives - ALWAYS SHOW */}
             {result.alternatives.length > 0 && (
-                <div className="mb-6">
+                <div className="mb-10">
                   <div className="flex items-center justify-between mb-4">
                      <h3 className="text-lg font-bold text-[#1C1C1C]">Better Alternatives</h3>
                      <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">Scroll for more</span>
@@ -376,7 +388,21 @@ const ResultModal: React.FC<ResultModalProps> = ({ result, onClose, isLoading })
                 </div>
             )}
 
-            <Button onClick={onClose} fullWidth className="shadow-xl shadow-[#6FAE9A]/20">Scan Another Item</Button>
+            <div className="flex flex-col gap-3">
+                {/* Only show Favorite button if NOT in history view as requested */}
+                {!isHistoryView && (
+                    <Button 
+                        variant="secondary" 
+                        fullWidth 
+                        onClick={handleFavoriteClick}
+                        className="flex gap-3 !h-12 border-none bg-white shadow-sm"
+                    >
+                        <Star size={20} className={isFavorited ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'} />
+                        <span className="text-gray-700 font-bold">{isFavorited ? 'In Favorites' : 'Add to Favorites'}</span>
+                    </Button>
+                )}
+                <Button onClick={onClose} fullWidth className="shadow-xl shadow-[#6FAE9A]/20">Scan Another Item</Button>
+            </div>
         </div>
       </div>
     </div>

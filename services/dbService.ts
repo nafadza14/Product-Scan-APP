@@ -1,16 +1,13 @@
 import { supabase } from './supabaseClient';
-import { UserProfile, ScanHistoryItem } from '../types';
+import { UserProfile, ScanHistoryItem, AppLanguage } from '../types';
 
 const CACHE_PREFIX = 'vitalSense_';
-
-// --- CACHING HELPERS ---
 
 export const getCachedProfile = (userId: string): UserProfile | null => {
   try {
     const data = localStorage.getItem(`${CACHE_PREFIX}profile_${userId}`);
     return data ? JSON.parse(data) : null;
   } catch (e) { 
-    // If cache is corrupted, clear it
     localStorage.removeItem(`${CACHE_PREFIX}profile_${userId}`);
     return null; 
   }
@@ -20,7 +17,7 @@ export const cacheProfile = (userId: string, data: UserProfile) => {
   try {
     localStorage.setItem(`${CACHE_PREFIX}profile_${userId}`, JSON.stringify(data));
   } catch (e) {
-    console.warn("Storage quota exceeded, could not cache profile");
+    console.warn("Storage quota exceeded");
   }
 };
 
@@ -36,18 +33,12 @@ export const getCachedHistory = (userId: string): ScanHistoryItem[] | null => {
 
 export const cacheHistory = (userId: string, data: ScanHistoryItem[]) => {
   try {
-    // PERFORMANCE FIX: Only cache the latest 10 items locally to prevent 
-    // large JSON parsing from blocking the main thread on app open.
     const limitedData = data.slice(0, 10);
     localStorage.setItem(`${CACHE_PREFIX}history_${userId}`, JSON.stringify(limitedData));
   } catch (e) {
-    // If quota exceeded, clear old history to make space
-    console.warn("Storage quota exceeded, clearing history cache");
     localStorage.removeItem(`${CACHE_PREFIX}history_${userId}`);
   }
 };
-
-// --- DATABASE INTERACTIONS ---
 
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
   try {
@@ -62,18 +53,17 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
     return {
       name: data.name,
       condition: data.condition,
+      language: data.language || AppLanguage.EN,
       customConditionName: data.custom_condition_name,
       additionalContext: data.additional_context || [],
       currentSymptoms: data.current_symptoms || []
     };
   } catch (e) {
-    console.error("Network error fetching profile", e);
     return null;
   }
 };
 
 export const updateUserProfile = async (userId: string, profile: UserProfile) => {
-  // Update Cache Immediately (Optimistic)
   cacheProfile(userId, profile);
 
   const { error } = await supabase
@@ -82,6 +72,7 @@ export const updateUserProfile = async (userId: string, profile: UserProfile) =>
       id: userId,
       name: profile.name,
       condition: profile.condition,
+      language: profile.language,
       custom_condition_name: profile.customConditionName,
       additional_context: profile.additionalContext,
       current_symptoms: profile.currentSymptoms,
@@ -89,8 +80,7 @@ export const updateUserProfile = async (userId: string, profile: UserProfile) =>
     });
 
   if (error) {
-    console.error('Error updating profile:', error);
-    // Don't throw, allow the UI to continue optimistically
+    console.error('Error updating profile:', error.message || JSON.stringify(error, null, 2));
   }
 };
 
@@ -103,10 +93,7 @@ export const getScanHistory = async (userId: string): Promise<ScanHistoryItem[]>
         .order('created_at', { ascending: false })
         .limit(20);
 
-    if (error) {
-        console.error('Error fetching history:', error);
-        return [];
-    }
+    if (error) return [];
 
     return data.map((item: any) => ({
         id: item.id,
@@ -118,7 +105,6 @@ export const getScanHistory = async (userId: string): Promise<ScanHistoryItem[]>
         explanation: item.explanation,
         ingredients: item.ingredients || [],
         alternatives: item.alternatives || [],
-        // Ensure all detailed analysis fields are mapped from DB snake_case to app camelCase
         score: item.score || 0,
         nutriScore: item.nutri_score,
         fullIngredientList: item.full_ingredient_list || '',
@@ -126,13 +112,11 @@ export const getScanHistory = async (userId: string): Promise<ScanHistoryItem[]>
         dietarySuitability: item.dietary_suitability || undefined
     }));
   } catch (e) {
-    console.error("Failed to load history", e);
     return [];
   }
 };
 
 export const addScanResult = async (userId: string, result: ScanHistoryItem) => {
-  // Fire and forget - don't await this in the UI thread
   supabase
     .from('scans')
     .insert({
@@ -146,13 +130,13 @@ export const addScanResult = async (userId: string, result: ScanHistoryItem) => 
       ingredients: result.ingredients,
       alternatives: result.alternatives,
       timestamp: result.timestamp,
-      // Save full analysis details
       score: result.score,
       nutri_score: result.nutriScore,
       full_ingredient_list: result.fullIngredientList,
       nutrition_advisor: result.nutritionAdvisor,
+      // Fix: corrected property access from dietary_suitability to dietarySuitability to match ScanHistoryItem type
       dietary_suitability: result.dietarySuitability
     }).then(({ error }) => {
-       if (error) console.error('Error adding scan to history:', error);
+       if (error) console.error('Error adding scan:', error.message || JSON.stringify(error, null, 2));
     });
 };

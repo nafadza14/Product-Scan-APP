@@ -1,36 +1,47 @@
+
 import { GoogleGenAI, Type, HarmCategory, HarmBlockThreshold } from "@google/genai";
-import { ScanResult, UserProfile, ScanStatus, HealthCondition } from "../types";
-
-const GEMINI_API_KEY = process.env.API_KEY || '';
-
-// Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+import { ScanResult, UserProfile, ScanStatus, HealthCondition, AppLanguage } from "../types";
 
 export const analyzeImage = async (
   imageBase64: string, 
   userProfile: UserProfile
 ): Promise<ScanResult> => {
   
-  if (!GEMINI_API_KEY) {
-      console.error("Gemini API Key is missing.");
-      return {
-        productName: "Configuration Error",
-        category: "Other",
-        icon: "⚠️",
-        status: ScanStatus.CAUTION,
-        score: 50,
-        explanation: "API Key missing. Check Vercel Environment Variables.",
-        ingredients: [],
-        fullIngredientList: "Not available",
-        alternatives: []
-      };
+  // Directly use process.env.API_KEY as per instructions
+  const apiKey = process.env.API_KEY;
+  const lang = userProfile.language || AppLanguage.EN;
+
+  const languageMap: Record<AppLanguage, string> = {
+    [AppLanguage.EN]: "English",
+    [AppLanguage.ID]: "Bahasa Indonesia",
+    [AppLanguage.AR]: "Arabic",
+    [AppLanguage.FR]: "French",
+    [AppLanguage.ZH]: "Simplified Chinese"
+  };
+
+  const currentLanguageName = languageMap[lang];
+
+  if (!apiKey || apiKey === 'undefined' || apiKey === "") {
+    const isID = lang === AppLanguage.ID;
+    return {
+      productName: isID ? "Error Konfigurasi" : "Configuration Error",
+      category: "Other",
+      icon: "⚠️",
+      status: ScanStatus.CAUTION,
+      score: 0,
+      explanation: isID 
+        ? "Kunci API tidak ditemukan. Pastikan Anda telah mengonfigurasi API_KEY di Vercel atau memilih kunci secara manual."
+        : "API Key missing. Ensure you have configured API_KEY in Vercel or selected a key manually.",
+      ingredients: [],
+      fullIngredientList: "",
+      alternatives: []
+    };
   }
 
-  // Use gemini-2.5-flash for speed
-  const modelId = "gemini-2.5-flash";
+  const ai = new GoogleGenAI({ apiKey: apiKey });
+  const modelId = "gemini-3-pro-preview"; 
 
   const isCustomCondition = userProfile.condition === HealthCondition.MORE_DISEASES;
-
   const conditionLabel = isCustomCondition 
     ? `Specific Condition: ${userProfile.customConditionName}` 
     : userProfile.condition;
@@ -43,42 +54,20 @@ export const analyzeImage = async (
     ? userProfile.currentSymptoms.join(', ')
     : "None";
 
-  // Optimized System Instruction for Granular Cosmetic Analysis
   const systemInstruction = `
-    Analyze product label image.
-    Profile: ${conditionLabel}. Context: ${contextStr}. Symptoms: ${symptomsStr}.
-    
-    Task:
-    1. Identify Product Name & Category ('Food' or 'Cosmetic').
-    2. Assess safety (SAFE, CAUTION, AVOID) & score (0-100) based on ingredients + profile.
-    
-    --- CATEGORY LOGIC ---
-    
-    IF 'Food':
-       - Extract Nutrition Advisor (Fat, Sat Fat, Sugar, Salt, Protein).
-       - Determine Dietary Suitability (Vegan, Gluten-Free, etc).
-       - Ingredients: List MODERATE/HIGH risks for health.
-    
-    IF 'Cosmetic' (Skincare, Make-up, Haircare, Household):
-       - SKIP Nutrition Advisor, Dietary Suitability, NutriScore (return null/empty).
-       - PERFORM DEEP INGREDIENT SAFETY CHECK:
-         * Endocrine Disruptors (e.g., Parabens, Phthalates, Triclosan) -> HIGH RISK.
-         * Carcinogens (e.g., Formaldehyde releasers, PEGs with contamination risk) -> HIGH RISK.
-         * Allergens (e.g., Fragrance/Parfum, Methylisothiazolinone, Linalool) -> MODERATE/HIGH depending on profile.
-         * Irritants (e.g., SLS/SLES, Drying Alcohols like Denat) -> MODERATE RISK.
-         * Comedogenic (e.g., Isopropyl Myristate, Coconut Oil - for face products) -> MODERATE RISK.
-       - 'ingredients' array MUST list these risky items.
-       - 'description' for each ingredient MUST start with the classification, e.g., "[Endocrine Disruptor] Linked to hormonal imbalance..." or "[Comedogenic] May clog pores...".
-    
-    --- OUTPUT FORMAT ---
-    
-    Common for BOTH:
-       - 'fullIngredientList': Transcription of the full ingredient text.
-       - 'ingredients': Structured array of DETECTED RISKS ONLY.
-       - 'alternatives': Max 2 healthy/safer swaps.
-       - 'icon': Single emoji.
-    
-    Output strictly JSON.
+    You are an expert health assistant. Analyze a product label (Food/Cosmetic) based on this profile:
+    Profile: ${conditionLabel}
+    Context: ${contextStr}
+    Symptoms: ${symptomsStr}
+
+    OUTPUT LANGUAGE: ${currentLanguageName}. All text fields in the JSON response must be in ${currentLanguageName}.
+
+    RULES:
+    1. DO NOT transcribe the entire label text. 
+    2. 'fullIngredientList' MAX 30 words.
+    3. 'explanation' MAX 2 sentences.
+    4. Provide short, professional medical reasoning.
+    5. Ensure valid JSON.
   `;
 
   try {
@@ -93,17 +82,18 @@ export const analyzeImage = async (
             }
           },
           {
-            text: "Analyze. Return valid JSON."
+            text: `Analyze this image and provide results in ${currentLanguageName} in JSON format according to the schema.`
           }
         ]
       },
       config: {
         systemInstruction: systemInstruction,
         responseMimeType: "application/json",
+        maxOutputTokens: 1024,
+        thinkingConfig: { thinkingBudget: 512 }, 
         safetySettings: [
           { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
           { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
           { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
         ],
         responseSchema: {
@@ -125,7 +115,8 @@ export const analyzeImage = async (
                   name: { type: Type.STRING },
                   riskLevel: { type: Type.STRING, enum: ["Safe", "High Risk", "Moderate"] },
                   description: { type: Type.STRING }
-                }
+                },
+                required: ["name", "riskLevel"]
               }
             },
             nutritionAdvisor: {
@@ -133,9 +124,9 @@ export const analyzeImage = async (
                 items: {
                     type: Type.OBJECT,
                     properties: {
-                        name: { type: Type.STRING, enum: ["Fat", "Saturated Fat", "Sugar", "Salt", "Protein"] },
+                        name: { type: Type.STRING },
                         value: { type: Type.STRING },
-                        level: { type: Type.STRING, enum: ["Low", "Medium", "High"] }
+                        level: { type: Type.STRING }
                     }
                 }
             },
@@ -165,18 +156,13 @@ export const analyzeImage = async (
     });
 
     const text = response.text;
-    if (!text) throw new Error("No response from AI");
+    if (!text) throw new Error("AI response empty");
 
-    const cleanText = text.replace(/```json\n?|\n?```/g, "").trim();
-    const data = JSON.parse(cleanText);
+    const data = JSON.parse(text.trim());
 
     let statusEnum = ScanStatus.SAFE;
     if (data.status === 'AVOID') statusEnum = ScanStatus.AVOID;
     if (data.status === 'CAUTION') statusEnum = ScanStatus.CAUTION;
-
-    // Handle N/A NutriScore
-    let finalNutriScore = data.nutriScore;
-    if (finalNutriScore === 'N/A') finalNutriScore = undefined;
 
     return {
       productName: data.productName || "Unknown Product",
@@ -184,29 +170,33 @@ export const analyzeImage = async (
       icon: data.icon || "📦",
       status: statusEnum,
       score: data.score || 50,
-      nutriScore: finalNutriScore,
+      nutriScore: (data.nutriScore === 'N/A' || !data.nutriScore) ? undefined : data.nutriScore,
       explanation: data.explanation || "Analysis complete.",
-      fullIngredientList: data.fullIngredientList || "Ingredients not found.",
-      ingredients: data.ingredients || [],
+      fullIngredientList: data.fullIngredientList || "Ingredients not readable.",
+      ingredients: (data.ingredients || []).slice(0, 10),
       nutritionAdvisor: data.nutritionAdvisor || [],
       dietarySuitability: data.dietarySuitability,
-      alternatives: data.alternatives || []
+      alternatives: (data.alternatives || []).slice(0, 3)
     };
 
   } catch (error: any) {
     console.error("Gemini Analysis Failed:", error);
     
+    let errorMessage = "Failed to contact AI server.";
+    
+    if (error?.status === 403 || error?.message?.includes("403")) {
+      errorMessage = "Access denied (403). Check if Google Cloud billing project is active.";
+    }
+
     return {
-      productName: "Scan Failed",
+      productName: "Analysis Error",
       category: "Other",
       icon: "⚠️",
       status: ScanStatus.CAUTION,
       score: 0,
-      explanation: "Could not analyze product. Please try again.",
+      explanation: errorMessage,
       ingredients: [],
       fullIngredientList: "",
-      nutritionAdvisor: [],
-      dietarySuitability: { vegan: false, vegetarian: false, glutenFree: false, lactoseFree: false },
       alternatives: []
     };
   }

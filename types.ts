@@ -9,6 +9,14 @@ export enum ViewState {
   PROFILE = 'PROFILE'
 }
 
+export enum AppLanguage {
+  EN = 'en',
+  ID = 'id',
+  AR = 'ar',
+  FR = 'fr',
+  ZH = 'zh-CN'
+}
+
 export enum HealthCondition {
   PREGNANCY = 'Pregnancy',
   CANCER_CARE = 'Cancer Care',
@@ -22,9 +30,10 @@ export enum HealthCondition {
 export interface UserProfile {
   name: string;
   condition: HealthCondition;
-  customConditionName?: string; // For "More Diseases" input
-  additionalContext: string[]; // Specific restrictions or answers from Step 2
-  currentSymptoms: string[];   // Transient symptoms from Step 3
+  language: AppLanguage;
+  customConditionName?: string; 
+  additionalContext: string[]; 
+  currentSymptoms: string[];   
 }
 
 export enum ScanStatus {
@@ -41,7 +50,7 @@ export interface IngredientAnalysis {
 
 export interface MacroNutrient {
   name: 'Fat' | 'Saturated Fat' | 'Sugar' | 'Salt' | 'Protein';
-  value: string; // e.g., "1.8g"
+  value: string; 
   level: 'Low' | 'Medium' | 'High';
 }
 
@@ -54,22 +63,23 @@ export interface DietarySuitability {
 
 export interface ScanResult {
   productName: string;
-  category: 'Food' | 'Cosmetic' | 'Other'; // Added Category
-  icon?: string; // Emoji representation
+  category: 'Food' | 'Cosmetic' | 'Other'; 
+  icon?: string; 
   status: ScanStatus;
-  score: number; // 0 to 100
-  nutriScore?: 'A' | 'B' | 'C' | 'D' | 'E'; // Optional for non-food
+  score: number; 
+  nutriScore?: 'A' | 'B' | 'C' | 'D' | 'E'; 
   explanation: string;
-  ingredients: IngredientAnalysis[]; // Risk analysis ingredients
-  fullIngredientList: string; // Full text list
-  nutritionAdvisor?: MacroNutrient[]; // Optional for non-food
-  dietarySuitability?: DietarySuitability; // Optional for non-food
+  ingredients: IngredientAnalysis[]; 
+  fullIngredientList: string; 
+  nutritionAdvisor?: MacroNutrient[]; 
+  dietarySuitability?: DietarySuitability; 
   alternatives: Array<{ name: string; reason: string }>;
 }
 
 export interface ScanHistoryItem extends ScanResult {
   id: string;
   timestamp: number;
+  isFavorite?: boolean;
 }
 
 export interface DashboardStat {
@@ -86,6 +96,6 @@ export interface Article {
   sourceUrl: string;
   date: string;
   readTime: string;
-  content: string[]; // Array of paragraphs for in-app reading
+  content: string[]; 
   summary: string;
 }
