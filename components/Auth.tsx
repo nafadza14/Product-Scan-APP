@@ -57,10 +57,15 @@ const Auth: React.FC<AuthProps> = ({ onCancel }) => {
     setLoading(true);
     setErrorMessage(null);
     try {
+      // Ensure the redirect points exactly to the current base URL
+      const redirectTo = window.location.origin.endsWith('/') 
+        ? window.location.origin 
+        : `${window.location.origin}/`;
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: redirectTo,
           queryParams: {
             access_type: 'offline',
             prompt: 'select_account',
@@ -70,7 +75,7 @@ const Auth: React.FC<AuthProps> = ({ onCancel }) => {
       if (error) throw error;
     } catch (error: any) {
       console.error("Google Auth Error:", error);
-      setErrorMessage("Gagal masuk dengan Google. Pastikan konfigurasi di Google Cloud Console sudah benar.");
+      setErrorMessage("Gagal masuk dengan Google. Pastikan URL Situs di Supabase Dashboard sudah diatur ke URL Vercel Anda.");
       setLoading(false);
     }
   };
@@ -123,13 +128,13 @@ const Auth: React.FC<AuthProps> = ({ onCancel }) => {
                         onClick={() => setShowOAuthHelp(!showOAuthHelp)}
                         className="text-[10px] font-bold text-red-700 underline flex items-center gap-1"
                     >
-                        <HelpCircle size={10} /> Masalah 403 Forbidden?
+                        <HelpCircle size={10} /> Masalah Redirect?
                     </button>
                     
                     {showOAuthHelp && (
                         <div className="mt-3 p-3 bg-white/50 rounded-xl text-[10px] text-red-800 space-y-2 border border-red-200">
-                            <p><strong>Penyebab:</strong> Proyek Google Anda mungkin masih dalam status &quot;Testing&quot;.</p>
-                            <p><strong>Solusi:</strong> Di Google Cloud Console &gt; OAuth Consent Screen, klik <strong>&quot;Publish App&quot;</strong> agar statusnya menjadi &quot;In Production&quot;, atau tambahkan email Anda ke daftar <strong>&quot;Test Users&quot;</strong>.</p>
+                            <p><strong>Penyebab:</strong> Supabase mencoba mengirim Anda kembali ke localhost.</p>
+                            <p><strong>Solusi:</strong> Buka Supabase Dashboard &gt; Auth &gt; URL Configuration. Ubah <strong>Site URL</strong> menjadi URL Vercel Anda (misal: <code>https://app.vercel.app</code>).</p>
                         </div>
                     )}
                 </div>
