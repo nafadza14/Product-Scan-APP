@@ -381,16 +381,19 @@ const App: React.FC = () => {
         if (profile) {
           setUser(profile);
           setView(ViewState.HOME);
+          setActiveTab('Home'); // Ensure user goes to Home tab after sign-in
           const history = await getScanHistory(session.user.id);
           setScanHistory(history);
         } else {
           setView(ViewState.ONBOARDING);
+          setActiveTab('Home'); // Default tab to Home even for new users after onboarding
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setUserId(null);
         setScanHistory([]);
         setView(ViewState.HOME);
+        setActiveTab('Home');
       }
     });
 
@@ -466,6 +469,7 @@ const App: React.FC = () => {
     setUserId(null);
     setScanHistory([]);
     setView(ViewState.HOME);
+    setActiveTab('Home');
   };
 
   const formatTimeAgo = (timestamp: number): string => {
@@ -513,7 +517,7 @@ const App: React.FC = () => {
   );
 
   if (view === ViewState.AUTH) return <Suspense fallback={<LoadingSpinner />}><Auth onCancel={() => setView(ViewState.HOME)} /></Suspense>;
-  if (view === ViewState.ONBOARDING) return <Suspense fallback={<LoadingSpinner />}><Onboarding onComplete={(p) => { updateUserProfile(userId!, p); setUser(p); setView(ViewState.HOME); }} /></Suspense>;
+  if (view === ViewState.ONBOARDING) return <Suspense fallback={<LoadingSpinner />}><Onboarding onComplete={(p) => { updateUserProfile(userId!, p); setUser(p); setView(ViewState.HOME); setActiveTab('Home'); }} /></Suspense>;
   if (view === ViewState.SCANNER) return <Suspense fallback={<LoadingSpinner />}><Scanner onCapture={handleScanCapture} onClose={() => setView(ViewState.HOME)} /></Suspense>;
 
   // FULL-SCREEN RANKING VIEW

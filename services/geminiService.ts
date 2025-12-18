@@ -7,7 +7,6 @@ export const analyzeImage = async (
   userProfile: UserProfile
 ): Promise<ScanResult> => {
   
-  // Directly use process.env.API_KEY as per instructions
   const apiKey = process.env.API_KEY;
   const lang = userProfile.language || AppLanguage.EN;
 
@@ -30,8 +29,8 @@ export const analyzeImage = async (
       status: ScanStatus.CAUTION,
       score: 0,
       explanation: isID 
-        ? "Kunci API tidak ditemukan. Pastikan Anda telah mengonfigurasi API_KEY di Vercel atau memilih kunci secara manual."
-        : "API Key missing. Ensure you have configured API_KEY in Vercel or selected a key manually.",
+        ? "Kunci API tidak ditemukan. Pastikan Anda telah mengonfigurasi API_KEY."
+        : "API Key missing. Please check your configuration.",
       ingredients: [],
       fullIngredientList: "",
       alternatives: []
@@ -39,35 +38,36 @@ export const analyzeImage = async (
   }
 
   const ai = new GoogleGenAI({ apiKey: apiKey });
-  const modelId = "gemini-3-pro-preview"; 
+  // Using flash for better reliability and lower latency in vision-to-json tasks
+  const modelId = "gemini-3-flash-preview"; 
 
   const isCustomCondition = userProfile.condition === HealthCondition.MORE_DISEASES;
   const conditionLabel = isCustomCondition 
     ? `Specific Condition: ${userProfile.customConditionName}` 
     : userProfile.condition;
 
-  const contextStr = userProfile.additionalContext.length > 0 
-    ? userProfile.additionalContext.join(', ') 
-    : "None";
-    
-  const symptomsStr = userProfile.currentSymptoms.length > 0
-    ? userProfile.currentSymptoms.join(', ')
-    : "None";
+  const contextStr = userProfile.additionalContext.length > 0 ? userProfile.additionalContext.join(', ') : "None";
+  const symptomsStr = userProfile.currentSymptoms.length > 0 ? userProfile.currentSymptoms.join(', ') : "None";
 
   const systemInstruction = `
-    You are an expert health assistant. Analyze a product label (Food/Cosmetic) based on this profile:
-    Profile: ${conditionLabel}
-    Context: ${contextStr}
-    Symptoms: ${symptomsStr}
+    You are a professional health and ingredient analyst. 
+    Analyze the provided product image based on this user profile:
+    - Condition: ${conditionLabel}
+    - Details: ${contextStr}
+    - Symptoms: ${symptomsStr}
 
-    OUTPUT LANGUAGE: ${currentLanguageName}. All text fields in the JSON response must be in ${currentLanguageName}.
+    CRITICAL SCORING ALIGNMENT:
+    - Nutri-Score (A-E) and personalized Safety Score (0-100) MUST be consistent.
+    - A product with Nutri-Score 'D' or 'E' (high sugar/processed/fats) is a health risk for almost ALL sensitive conditions (Pregnancy, Autoimmune, etc).
+    - If Nutri-Score is 'D', the Safety Score MUST be between 30 and 55.
+    - If Nutri-Score is 'E', the Safety Score MUST be below 30.
+    - NEVER give a score above 60 to a Nutri-Score 'D' or 'E' product.
+    - For Pregnancy: Penalize high sugar (Nutri-Score D/E) heavily due to Gestational Diabetes risks.
 
-    RULES:
-    1. DO NOT transcribe the entire label text. 
-    2. 'fullIngredientList' MAX 30 words.
-    3. 'explanation' MAX 2 sentences.
-    4. Provide short, professional medical reasoning.
-    5. Ensure valid JSON.
+    RESPONSE FORMAT:
+    - Language: ${currentLanguageName}.
+    - 'explanation': Briefly explain why the Nutri-Score led to the specific Safety Score for their condition.
+    - Output valid JSON only.
   `;
 
   try {
@@ -82,19 +82,19 @@ export const analyzeImage = async (
             }
           },
           {
-            text: `Analyze this image and provide results in ${currentLanguageName} in JSON format according to the schema.`
+            text: `Identify product, ingredients, and provide health analysis in ${currentLanguageName}. Ensure Safety Score is below 60 if Nutri-Score is D or E.`
           }
         ]
       },
       config: {
         systemInstruction: systemInstruction,
         responseMimeType: "application/json",
-        maxOutputTokens: 1024,
-        thinkingConfig: { thinkingBudget: 512 }, 
+        thinkingConfig: { thinkingBudget: 0 }, // Disable thinking for faster vision response
         safetySettings: [
-          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
         ],
         responseSchema: {
           type: Type.OBJECT,
@@ -115,8 +115,7 @@ export const analyzeImage = async (
                   name: { type: Type.STRING },
                   riskLevel: { type: Type.STRING, enum: ["Safe", "High Risk", "Moderate"] },
                   description: { type: Type.STRING }
-                },
-                required: ["name", "riskLevel"]
+                }
               }
             },
             nutritionAdvisor: {
@@ -150,25 +149,22 @@ export const analyzeImage = async (
               }
             }
           },
-          required: ["productName", "category", "status", "score", "explanation", "ingredients", "alternatives", "icon"]
+          required: ["productName", "category", "status", "score", "explanation", "ingredients", "alternatives"]
         }
       }
     });
 
-    const text = response.text;
-    if (!text) throw new Error("AI response empty");
+    if (!response.text) {
+      throw new Error("AI response empty. This may be due to safety filters on the image.");
+    }
 
-    const data = JSON.parse(text.trim());
-
-    let statusEnum = ScanStatus.SAFE;
-    if (data.status === 'AVOID') statusEnum = ScanStatus.AVOID;
-    if (data.status === 'CAUTION') statusEnum = ScanStatus.CAUTION;
+    const data = JSON.parse(response.text.trim());
 
     return {
       productName: data.productName || "Unknown Product",
       category: data.category || "Food",
-      icon: data.icon || "📦",
-      status: statusEnum,
+      icon: data.icon || (data.category === 'Cosmetic' ? "🧴" : "📦"),
+      status: (data.status as ScanStatus) || ScanStatus.CAUTION,
       score: data.score || 50,
       nutriScore: (data.nutriScore === 'N/A' || !data.nutriScore) ? undefined : data.nutriScore,
       explanation: data.explanation || "Analysis complete.",
@@ -181,20 +177,13 @@ export const analyzeImage = async (
 
   } catch (error: any) {
     console.error("Gemini Analysis Failed:", error);
-    
-    let errorMessage = "Failed to contact AI server.";
-    
-    if (error?.status === 403 || error?.message?.includes("403")) {
-      errorMessage = "Access denied (403). Check if Google Cloud billing project is active.";
-    }
-
     return {
       productName: "Analysis Error",
       category: "Other",
       icon: "⚠️",
       status: ScanStatus.CAUTION,
       score: 0,
-      explanation: errorMessage,
+      explanation: error.message || "Failed to analyze image.",
       ingredients: [],
       fullIngredientList: "",
       alternatives: []

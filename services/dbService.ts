@@ -1,5 +1,6 @@
+
 import { supabase } from './supabaseClient';
-import { UserProfile, ScanHistoryItem, AppLanguage } from '../types';
+import { UserProfile, ScanHistoryItem, AppLanguage, ScanStatus } from '../types';
 
 const CACHE_PREFIX = 'vitalSense_';
 
@@ -86,44 +87,52 @@ export const updateUserProfile = async (userId: string, profile: UserProfile) =>
 
 export const getScanHistory = async (userId: string): Promise<ScanHistoryItem[]> => {
   try {
+    // Removed 'category' from select to avoid schema error
     const { data, error } = await supabase
         .from('scans')
-        .select('*')
+        .select('id, timestamp, product_name, icon, status, explanation, ingredients, alternatives, score, nutri_score, full_ingredient_list, nutrition_advisor, dietary_suitability')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(20);
 
     if (error) return [];
 
-    return data.map((item: any) => ({
-        id: item.id,
-        timestamp: item.timestamp,
-        productName: item.product_name,
-        category: item.category || 'Food',
-        icon: item.icon,
-        status: item.status,
-        explanation: item.explanation,
-        ingredients: item.ingredients || [],
-        alternatives: item.alternatives || [],
-        score: item.score || 0,
-        nutriScore: item.nutri_score,
-        fullIngredientList: item.full_ingredient_list || '',
-        nutritionAdvisor: item.nutrition_advisor || [],
-        dietarySuitability: item.dietary_suitability || undefined
-    }));
+    return data.map((item: any) => {
+        // Infer category if missing in DB
+        const isCosmetic = item.product_name.toLowerCase().includes('cream') || 
+                          item.product_name.toLowerCase().includes('wash') || 
+                          item.product_name.toLowerCase().includes('serum');
+        
+        return {
+            id: item.id,
+            timestamp: item.timestamp,
+            productName: item.product_name,
+            category: isCosmetic ? 'Cosmetic' : 'Food',
+            icon: item.icon,
+            status: item.status,
+            explanation: item.explanation,
+            ingredients: item.ingredients || [],
+            alternatives: item.alternatives || [],
+            score: item.score || 0,
+            nutriScore: item.nutri_score,
+            fullIngredientList: item.full_ingredient_list || '',
+            nutritionAdvisor: item.nutrition_advisor || [],
+            dietarySuitability: item.dietary_suitability || undefined
+        };
+    });
   } catch (e) {
     return [];
   }
 };
 
 export const addScanResult = async (userId: string, result: ScanHistoryItem) => {
+  // Removed 'category' column from insert payload to fix Supabase schema error
   supabase
     .from('scans')
     .insert({
       id: result.id,
       user_id: userId,
       product_name: result.productName,
-      category: result.category,
       icon: result.icon,
       status: result.status,
       explanation: result.explanation,
@@ -134,7 +143,6 @@ export const addScanResult = async (userId: string, result: ScanHistoryItem) => 
       nutri_score: result.nutriScore,
       full_ingredient_list: result.fullIngredientList,
       nutrition_advisor: result.nutritionAdvisor,
-      // Fix: corrected property access from dietary_suitability to dietarySuitability to match ScanHistoryItem type
       dietary_suitability: result.dietarySuitability
     }).then(({ error }) => {
        if (error) console.error('Error adding scan:', error.message || JSON.stringify(error, null, 2));
