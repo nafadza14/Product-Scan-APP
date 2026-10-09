@@ -4,6 +4,8 @@ import { ScanLine, ArrowRight, Smile, ChevronRight, KeyRound, HeartPulse } from 
 import { ScanHistoryItem, SkinScanItem, UserProfile, ScanMode, ScanStatus } from '../types';
 import { Translator, conditionLabel, timeAgo } from '../i18n';
 import { Avatar, Pressable, ProductIcon, Ring } from './ui';
+import { Thumb } from './diary/shared';
+import { scoreOf } from '../services/diaryService';
 
 interface Props {
   t: Translator;
@@ -172,10 +174,17 @@ const HomeView: React.FC<Props> = ({
                   onClick={() => onOpenSkin(r.item)}
                   className="snap-start shrink-0 w-[156px] rounded-3xl bg-white p-3 text-start shadow-soft"
                 >
-                  <div className="h-[112px] rounded-2xl bg-coral/10 flex items-center justify-center mb-3">
-                    <Ring value={Math.round((r.item.metrics.moisture + r.item.metrics.texture + r.item.metrics.firmness) / 3)} size={64} stroke={6}>
-                      <Smile size={22} className="text-coral" />
-                    </Ring>
+                  <div className="h-[112px] rounded-2xl bg-coral/10 flex items-center justify-center mb-3 relative overflow-hidden">
+                    {r.item.photoId ? (
+                      <Thumb photoId={r.item.photoId} className="absolute inset-0 w-full h-full" label={t('skinCheck')} />
+                    ) : (
+                      <Smile size={30} className="text-coral" />
+                    )}
+                    <span className="absolute top-2 end-2">
+                      <Ring value={scoreOf(r.item)} size={34} stroke={4} track="#fff">
+                        <span className="text-[10px] font-semibold text-ink">{scoreOf(r.item)}</span>
+                      </Ring>
+                    </span>
                   </div>
                   <p className="text-[15px] font-semibold text-ink leading-tight min-h-[2.5em]">{t('skinCheck')}</p>
                   <p className="text-[13px] text-ink-muted mt-1">{timeAgo(t, r.item.timestamp)}</p>

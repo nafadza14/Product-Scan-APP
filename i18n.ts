@@ -1,6 +1,7 @@
 import { AppLanguage, HealthCondition } from './types';
+import { diaryEn, diaryId, diaryFr, diaryAr, diaryZh } from './i18n-diary';
 
-const en = {
+const baseEn = {
   cancel: 'Cancel',
   close: 'Close',
   back: 'Back',
@@ -232,10 +233,12 @@ const en = {
   condOtherSub: 'Tell us what to watch for'
 };
 
+const en = { ...baseEn, ...diaryEn };
 export type TranslationKey = keyof typeof en;
 type Dict = Record<TranslationKey, string>;
+type BaseDict = Record<keyof typeof baseEn, string>;
 
-const id: Dict = {
+const idBase: BaseDict = {
   cancel: 'Batal',
   close: 'Tutup',
   back: 'Kembali',
@@ -456,7 +459,7 @@ const id: Dict = {
   condOtherSub: 'Beri tahu kami yang perlu diwaspadai'
 };
 
-const fr: Dict = {
+const frBase: BaseDict = {
   cancel: 'Annuler',
   close: 'Fermer',
   back: 'Retour',
@@ -677,7 +680,7 @@ const fr: Dict = {
   condOtherSub: 'Dites-nous quoi surveiller'
 };
 
-const ar: Dict = {
+const arBase: BaseDict = {
   cancel: 'إلغاء',
   close: 'إغلاق',
   back: 'رجوع',
@@ -898,7 +901,7 @@ const ar: Dict = {
   condOtherSub: 'أخبرنا بما يجب مراقبته'
 };
 
-const zh: Dict = {
+const zhBase: BaseDict = {
   cancel: '取消',
   close: '关闭',
   back: '返回',
@@ -1118,6 +1121,11 @@ const zh: Dict = {
   condOther: '其他状况',
   condOtherSub: '告诉我们需要留意什么'
 };
+
+const id: Dict = { ...idBase, ...diaryId };
+const fr: Dict = { ...frBase, ...diaryFr };
+const ar: Dict = { ...arBase, ...diaryAr };
+const zh: Dict = { ...zhBase, ...diaryZh };
 
 const dictionaries: Record<AppLanguage, Dict> = {
   [AppLanguage.EN]: en,

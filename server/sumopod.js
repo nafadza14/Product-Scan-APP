@@ -52,7 +52,7 @@ export async function handleChat(method, payload) {
       model: process.env.SUMOPOD_MODEL || DEFAULT_MODEL,
       messages,
       temperature: typeof payload.temperature === 'number' ? payload.temperature : 0.2,
-      max_tokens: Math.min(Number(payload.max_tokens) || 2500, 4000)
+      max_tokens: Math.min(Number(payload.max_tokens) || 3000, 6000)
     })
   });
   return { status: upstream.status, body: await upstream.text() };

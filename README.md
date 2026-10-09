@@ -29,14 +29,15 @@ Add `SUMOPOD_API_KEY` under Project Settings, Environment Variables, then redepl
 | Home | Greeting, scan shortcuts, recent scans, daily symptom check-in, best matches |
 | Scanner | Product mode (rear camera) and Skin mode (front camera), upload from gallery, flash, tap to focus |
 | Product result | Personal score, Nutri-Score, flagged ingredients, nutrition levels, diet fit, alternatives, save to favorites |
-| Skin result | Skin type, five metrics, what we noticed, routine, ingredients to look for and skip |
-| Library | All scans with filters (Food, Skincare, Skin checks, Saved) and sort by date or score |
+| Skin result | Skin score with change since last check, photo quality and confidence, top priority, six-zone face map, nine concern levels, AM/PM routine with key ingredients, use as my routine |
+| Diary | Skin journal: today's check, AM/PM routine checklist, mood, sleep, water, stress, tags and notes; history timeline with photo compare; trends and patterns between diary entries and skin score; skin goals; product scan history |
 | Explore | Short, plain-language reads ordered by your health focus |
 | Profile | Health profile, symptoms, language (EN, ID, AR with RTL, FR, ZH), sign out |
 
 ## Data notes
 
-- Product scans are stored in the Supabase `scans` table. Favorites and skin checks are stored on the device only (no photos are kept anywhere).
+- Product scans are stored in the Supabase `scans` table.
+- The skin diary (skin checks, small photo thumbnails, daily logs, routine, goals) is stored on the device only: localStorage plus IndexedDB for photos. Nothing from the diary is uploaded except the photo sent for analysis.
 - The `profiles` table has no `language` column, so language is stored on the device. Add a `language text` column if you want it to follow the account.
 
 ## QA

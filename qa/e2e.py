@@ -46,6 +46,7 @@ state = {
     "gemini": "ok",  # ok | not_recognized | network
     "requests": [],
     "hold": False,
+    "last_ai_body": "",
     "held": [],
 }
 
@@ -80,15 +81,34 @@ PRODUCT = {
 
 SKIN = {
     "faceDetected": True,
+    "quality": {"lighting": "good", "sharp": True, "frontal": True, "confidence": 86},
     "skinType": "Combination",
+    "skinScore": 72,
     "metrics": {"moisture": 76, "firmness": 87, "texture": 58, "poreVisibility": 63, "evenness": 71},
-    "concerns": ["Pigmentation", "Blackheads", "Dry cheeks"],
+    "zones": [
+        {"zone": "forehead", "score": 70, "note": "A few small closed comedones near the hairline."},
+        {"zone": "tzone", "score": 55, "note": "Visible pores and some shine on the nose."},
+        {"zone": "leftCheek", "score": 80, "note": "Even and calm, slightly dry along the cheekbone."},
+        {"zone": "rightCheek", "score": 78, "note": "Similar to the left side, a little dry."},
+        {"zone": "chin", "score": 62, "note": "Two small red bumps along the jawline."},
+        {"zone": "underEye", "score": 68, "note": "Mild shadowing under both eyes."},
+    ],
+    "concernDetails": [
+        {"id": "breakouts", "severity": 1, "zones": ["chin", "forehead"], "note": "A few small bumps on the chin and near the hairline."},
+        {"id": "enlargedPores", "severity": 2, "zones": ["tzone"], "note": "Pores on the nose look larger than on the cheeks."},
+        {"id": "darkSpots", "severity": 1, "zones": ["leftCheek"], "note": "Faint marks where past breakouts healed."},
+        {"id": "redness", "severity": 0, "zones": [], "note": ""},
+    ],
+    "concerns": ["Visible pores", "Mild breakouts", "Dry cheeks"],
+    "topPriority": "Add a gentle niacinamide serum to the T-zone in the evening to calm oil and refine pores.",
     "summary": "Your skin looks well hydrated overall, with some congestion around the nose and a few uneven patches. Gentle exfoliation and daily sunscreen will help most.",
     "routine": [
-        {"step": "Gentle cleanser", "tip": "Use a low-foam cleanser morning and night."},
-        {"step": "Niacinamide serum", "tip": "Helps with oil and visible pores on the T-zone."},
-        {"step": "Moisturizer", "tip": "A light gel cream keeps cheeks comfortable."},
-        {"step": "Sunscreen SPF 30+", "tip": "Every morning, even when it is cloudy."},
+        {"time": "am", "step": "Gentle cleanser", "ingredient": "", "tip": "Use a low-foam cleanser so cheeks stay comfortable."},
+        {"time": "am", "step": "Niacinamide serum", "ingredient": "Niacinamide", "tip": "Helps with oil and visible pores on the T-zone."},
+        {"time": "am", "step": "Sunscreen SPF 30+", "ingredient": "Zinc oxide", "tip": "Every morning, even when it is cloudy."},
+        {"time": "pm", "step": "Cleanser", "ingredient": "", "tip": "Remove sunscreen thoroughly."},
+        {"time": "pm", "step": "Azelaic acid", "ingredient": "Azelaic acid", "tip": "Thin layer on the chin and marks, three nights a week."},
+        {"time": "pm", "step": "Moisturizer", "ingredient": "Ceramides", "tip": "A light gel cream keeps cheeks comfortable."},
     ],
     "lookFor": ["Niacinamide", "Azelaic acid", "Ceramides", "Zinc oxide"],
     "avoid": ["Retinol", "High-dose salicylic acid", "Hydroquinone"],
@@ -99,6 +119,7 @@ def ai_route(route: Route):
     if route.request.method == "GET":
         return route.fulfill(status=200, content_type="application/json", body=json.dumps({"configured": True, "model": "gemini/gemini-3.1-flash-lite"}))
     body = route.request.post_data or ""
+    state["last_ai_body"] = body
     state["requests"].append(("gemini", body[:200]))
     if state["gemini"] == "network":
         return route.abort("internetdisconnected")
@@ -392,11 +413,22 @@ def main():
             expect(page.get_by_role("heading", name=re.compile("Your skin analysis is ready"))).to_be_visible(timeout=8000)
             page.wait_for_timeout(1500)
             shot(page, "19-result-skin")
-            page.get_by_role("dialog").locator(".overflow-y-auto").first.evaluate("el => el.scrollTo(0, 800)")
+            dlg = page.get_by_role("dialog")
+            expect(dlg.get_by_text("First check. Your next ones will show progress.")).to_be_visible()
+            expect(dlg.get_by_text("Start with this")).to_be_visible()
+            expect(dlg.get_by_text("Good photo. Results are reliable.")).to_be_visible()
+            dlg.get_by_role("button", name=re.compile("Nose and T-zone")).click()
+            expect(dlg.get_by_text("Visible pores and some shine on the nose.")).to_be_visible()
+            dlg.locator(".overflow-y-auto").first.evaluate("el => el.scrollTo(0, 900)")
             shot(page, "20-result-skin-scrolled")
+            dlg.locator(".overflow-y-auto").first.evaluate("el => el.scrollTo(0, 1900)")
+            shot(page, "20b-result-skin-routine")
+            dlg.get_by_role("button", name="Use as my routine").click()
+            expect(dlg.get_by_role("button", name="Saved to your diary")).to_be_visible()
+            assert "selfie" in state["last_ai_body"] and "This is the first check" in state["last_ai_body"]
             page.get_by_role("button", name="Close").first.click()
             page.wait_for_timeout(600)
-        check("Skin check: front camera, mesh animation, metrics result", skin_scan)
+        check("Skin check: zones, concern levels, photo quality, routine saved", skin_scan)
 
         def mode_switch_and_upload():
             page.get_by_role("button", name="Scan").last.click()
@@ -410,26 +442,112 @@ def main():
             page.wait_for_timeout(600)
         check("Mode switch in scanner and photo upload path", mode_switch_and_upload)
 
-        # ---------- Library ----------
-        def library():
-            page.get_by_role("button", name="Library").click()
-            expect(page.get_by_role("heading", name="Library")).to_be_visible()
-            shot(page, "21-library")
-            page.get_by_role("button", name="Skin checks").click()
-            expect(page.get_by_text("Skin check").first).to_be_visible()
-            page.get_by_role("button", name="Saved", exact=True).first.click()
-            expect(page.locator("li")).to_have_count(1)
-            shot(page, "22-library-saved")
+        # ---------- Diary ----------
+        def diary_today():
+            page.get_by_role("button", name="Diary").click()
+            expect(page.get_by_role("heading", name="Skin diary")).to_be_visible()
+            expect(page.get_by_text("1-day streak")).to_be_visible()
+            expect(page.get_by_text("Today's skin check")).to_be_visible()
+            # routine from the skin check, morning/evening checklist
+            page.get_by_role("tab", name=re.compile("Morning")).click()
+            page.get_by_role("checkbox", name=re.compile("Gentle cleanser")).click()
+            page.get_by_role("checkbox", name=re.compile("Niacinamide serum")).click()
+            expect(page.get_by_text("2 of 3 done")).to_be_visible()
+            page.get_by_role("radio", name="Good").click()
+            page.get_by_role("button", name="More Sleep").click()
+            for _ in range(13):
+                page.get_by_role("button", name="More Sleep").click()
+            page.get_by_role("button", name=re.compile("Workout")).click()
+            page.get_by_role("button", name=re.compile("Sweets")).click()
+            page.get_by_placeholder(re.compile("Notes")).fill("Tried the new gel moisturizer.")
+            page.wait_for_timeout(700)
+            shot(page, "21-diary-today")
+            scroll_main_bottom(page)
+            shot(page, "21b-diary-today-bottom")
+            stored = page.evaluate(f"JSON.parse(localStorage.getItem('vitalSense_diary_{USER_ID}'))")
+            today = list(stored.values())[0]
+            assert today["feeling"] == 4 and today["sleep"] == 7 and set(today["tags"]) == {"workout", "sugar"}, today
+            assert len(today["done"]["am"]) == 2 and today["note"].startswith("Tried"), today
+        check("Diary today: routine checklist, mood, sleep, tags, note saved", diary_today)
+
+        def diary_goals_and_routine_edit():
+            page.evaluate("document.querySelectorAll('main').forEach(m => m.scrollTo(0, 0))")
+            page.get_by_role("button", name=re.compile("Your skin goals")).click()
+            page.get_by_role("checkbox", name="Clear breakouts").click()
+            page.get_by_role("checkbox", name="Hydration").click()
+            page.get_by_role("button", name="Save changes").click()
+            page.wait_for_timeout(600)
+            expect(page.get_by_text("Clear breakouts, Hydration")).to_be_visible()
+            page.get_by_role("button", name="Edit routine").click()
+            page.get_by_placeholder("Step, for example Cleanser").fill("Lip balm")
+            page.get_by_role("button", name="Add step").click()
+            shot(page, "22-routine-editor")
+            page.get_by_role("button", name="Save changes").click()
+            page.wait_for_timeout(600)
+            expect(page.get_by_text("2 of 4 done")).to_be_visible()
+        check("Goals and routine editor save", diary_goals_and_routine_edit)
+
+        def diary_history_trends_compare():
+            # Seed two weeks of history so trends and patterns have data.
+            page.evaluate(f"""() => {{
+              const uid = '{USER_ID}';
+              const skin = JSON.parse(localStorage.getItem('vitalSense_skin_' + uid));
+              const base = skin[0];
+              const day = 86400000;
+              const logs = JSON.parse(localStorage.getItem('vitalSense_diary_' + uid));
+              const pad = n => String(n).padStart(2,'0');
+              const key = ts => {{ const d = new Date(ts); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }};
+              for (let i = 1; i <= 8; i++) {{
+                const ts = Date.now() - i * day * 2;
+                const sugar = i % 2 === 0;
+                const score = 70 - i * 2 + (sugar ? -6 : 3);
+                skin.push({{ ...base, id: 'seed' + i, photoId: undefined, timestamp: ts, skinScore: score,
+                  metrics: {{ ...base.metrics, texture: base.metrics.texture - i * 2, moisture: base.metrics.moisture - i }} }});
+                const k = key(ts - day);
+                logs[k] = {{ date: k, tags: sugar ? ['sugar'] : [], sleep: sugar ? 6 : 8, done: {{ am: [], pm: [] }} }};
+              }}
+              localStorage.setItem('vitalSense_skin_' + uid, JSON.stringify(skin));
+              localStorage.setItem('vitalSense_diary_' + uid, JSON.stringify(logs));
+            }}""")
+            page.reload()
+            page.wait_for_load_state("networkidle")
+            page.get_by_role("button", name="Diary").click()
+            page.get_by_role("tab", name="History").click()
+            expect(page.get_by_text("Diary entry").first.or_(page.get_by_text("Tried the new gel moisturizer.")).first).to_be_visible()
+            shot(page, "23-diary-history")
+            page.get_by_role("button", name="Compare").click()
+            items = page.locator("ol li button[aria-pressed]")
+            items.nth(0).click()
+            items.nth(3).click()
+            expect(page.get_by_role("heading", name="Compare checks")).to_be_visible(timeout=4000)
+            page.wait_for_timeout(500)
+            shot(page, "24-compare")
+            page.get_by_role("button", name="Close").first.click()
+            page.wait_for_timeout(600)
+            page.get_by_role("tab", name="Trends").click()
             page.get_by_role("button", name="All", exact=True).click()
-            page.get_by_role("tab", name="Highest score").click()
-            first = page.locator("li").first
-            expect(first).to_contain_text("Skin check")  # skin avg 71 > product 46
-            page.locator("li").first.click()
-            expect(page.get_by_role("heading", name=re.compile("Your skin analysis is ready"))).to_be_visible()
-            page.go_back()  # system back closes the sheet
+            expect(page.get_by_text("Patterns in your diary")).to_be_visible()
+            expect(page.get_by_text(re.compile("On days with sweets"))).to_be_visible()
+            page.locator("main svg[role=img]").first.hover()
+            page.wait_for_timeout(500)
+            shot(page, "25-diary-trends")
+            scroll_main_bottom(page)
+            shot(page, "26-diary-metrics")
+        check("Diary history, compare two checks, trends and patterns", diary_history_trends_compare)
+
+        def products_from_diary():
+            page.evaluate("document.querySelectorAll('main').forEach(m => m.scrollTo(0, 0))")
+            page.get_by_role("tab", name="Today").click()
+            scroll_main_bottom(page)
+            page.get_by_role("button", name=re.compile("Product scans")).click()
+            dlg = page.get_by_role("dialog")
+            expect(dlg.get_by_text("Honey Oat Granola").first).to_be_visible()
+            dlg.get_by_role("button", name="Saved", exact=True).first.click()
+            expect(dlg.locator("li")).to_have_count(1)
+            page.go_back()
             page.wait_for_timeout(700)
             expect(page.get_by_role("dialog")).to_have_count(0)
-        check("Library filters, sort, open item, system back closes it", library)
+        check("Product scans open from the diary, system back closes", products_from_diary)
 
         # ---------- Explore ----------
         def explore():
@@ -495,9 +613,15 @@ def main():
             page.reload()
             page.wait_for_load_state("networkidle")
             expect(page.get_by_role("heading", name=re.compile("Hi Sarah"))).to_be_visible(timeout=6000)
-            page.get_by_role("button", name="Library").click()
-            page.get_by_role("button", name="Saved", exact=True).first.click()
-            expect(page.locator("li")).to_have_count(1)  # favorite survives the server refetch
+            page.get_by_role("button", name="Diary").click()
+            expect(page.get_by_text("Clear breakouts, Hydration")).to_be_visible()
+            scroll_main_bottom(page)
+            page.get_by_role("button", name=re.compile("Product scans")).click()
+            dlg = page.get_by_role("dialog")
+            dlg.get_by_role("button", name="Saved", exact=True).first.click()
+            expect(dlg.locator("li")).to_have_count(1)  # favorite survives the server refetch
+            page.go_back()
+            page.wait_for_timeout(600)
         check("Reload keeps session, history and favorites", persistence_after_reload)
 
         def sign_out():

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AppLanguage, Article, ScanHistoryItem, ScanMode, SkinScanItem, UserProfile } from './types';
+import { AppLanguage, Article, DiaryLog, DiaryPrefs, ScanHistoryItem, ScanMode, SkinScanItem, UserProfile, UserRoutine } from './types';
 import { makeT } from './i18n';
 import { supabase } from './services/supabaseClient';
 import {
@@ -18,6 +18,24 @@ import {
   updateUserProfile
 } from './services/dbService';
 import { checkAiConfigured } from './services/config';
+import {
+  dateKey,
+  emptyLog,
+  getLogs,
+  getPrefs,
+  getRoutine,
+  makeThumb,
+  recentLogText,
+  routineFromScan,
+  saveLogs,
+  savePhoto,
+  savePrefs,
+  saveRoutine,
+  scoreOf
+} from './services/diaryService';
+import DiaryView from './components/diary/DiaryView';
+import { CompareView, GoalsSheet, RoutineEditor } from './components/diary/DiarySheets';
+import { NavBar } from './components/ui';
 import HomeView from './components/HomeView';
 import { ExploreView, ArticlePage } from './components/ExploreView';
 import LibraryView from './components/LibraryView';
@@ -38,7 +56,11 @@ type Overlay =
   | { k: 'article'; article: Article }
   | { k: 'language' }
   | { k: 'auth'; mode: 'signin' | 'signup' }
-  | { k: 'onboarding'; mode: OnboardingMode };
+  | { k: 'onboarding'; mode: OnboardingMode }
+  | { k: 'routineEdit' }
+  | { k: 'goals' }
+  | { k: 'compare'; a: string; b: string }
+  | { k: 'products' };
 
 const presentation = (o: Overlay): 'push' | 'sheet' | 'full' =>
   o.k === 'article' ? 'push' : o.k === 'scanner' || (o.k === 'onboarding' && o.mode === 'new') ? 'full' : 'sheet';
@@ -66,6 +88,10 @@ const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [history, setHistory] = useState<ScanHistoryItem[]>([]);
   const [skinHistory, setSkinHistory] = useState<SkinScanItem[]>([]);
+  const [logs, setLogs] = useState<Record<string, DiaryLog>>({});
+  const [routine, setRoutine] = useState<UserRoutine | null>(null);
+  const [prefs, setPrefs] = useState<DiaryPrefs>({ goals: [] });
+  const [routineSource, setRoutineSource] = useState<string | null>(null);
   const [deviceLang, setDeviceLang] = useState<AppLanguage>(detectLanguage);
   const [hasApiKey, setHasApiKey] = useState(true);
   const [tab, setTab] = useState<Tab>('home');
@@ -141,6 +167,9 @@ const App: React.FC = () => {
       if (cached) setUser(cached);
       setHistory(getCachedHistory(id));
       setSkinHistory(getSkinHistory(id));
+      setLogs(getLogs(id));
+      setRoutine(getRoutine(id));
+      setPrefs(getPrefs(id));
 
       const profile = await getUserProfile(id);
       if (userIdRef.current !== id) return;
@@ -192,6 +221,9 @@ const App: React.FC = () => {
         setEmail(undefined);
         setHistory([]);
         setSkinHistory([]);
+        setLogs({});
+        setRoutine(null);
+        setPrefs({ goals: [] });
       }
     });
     return () => {
@@ -250,8 +282,23 @@ const App: React.FC = () => {
         // If the person closed the scanner while waiting, keep the result in history but don't pop a sheet.
         if (overlaysRef.current[overlaysRef.current.length - 1]?.k === 'scanner') replaceTop({ k: 'product', id: item.id });
       } else {
-        const result = await svc.analyzeSkin(base64, user);
-        const item: SkinScanItem = { ...result, id: crypto.randomUUID(), timestamp: Date.now() };
+        const prev = [...skinHistory].sort((a, b) => b.timestamp - a.timestamp)[0];
+        const routineText = routine
+          ? `morning: ${routine.am.map((r) => r.name + (r.product ? ` (${r.product})` : '')).join(', ') || 'none'}; evening: ${routine.pm.map((r) => r.name + (r.product ? ` (${r.product})` : '')).join(', ') || 'none'}`
+          : undefined;
+        const result = await svc.analyzeSkin(base64, user, {
+          goals: prefs.goals,
+          previous: prev
+            ? { daysAgo: Math.max(0, Math.round((Date.now() - prev.timestamp) / 86400000)), skinScore: scoreOf(prev), metrics: prev.metrics, concerns: prev.concerns }
+            : undefined,
+          recentLog: recentLogText(logs),
+          routine: routineText
+        });
+        const id = crypto.randomUUID();
+        // Keep a small thumbnail on this device so the diary can show progress photos.
+        const thumb = await makeThumb(`data:image/jpeg;base64,${base64}`);
+        await savePhoto(id, thumb);
+        const item: SkinScanItem = { ...result, id, timestamp: Date.now(), photoId: id };
         setSkinHistory((prev) => {
           const next = [item, ...prev];
           saveSkinHistory(userId, next);
@@ -260,8 +307,32 @@ const App: React.FC = () => {
         if (overlaysRef.current[overlaysRef.current.length - 1]?.k === 'scanner') replaceTop({ k: 'skin', id: item.id });
       }
     },
-    [user, userId, replaceTop]
+    [user, userId, replaceTop, skinHistory, routine, prefs, logs]
   );
+
+  // ---------- Diary ----------
+
+  const updateLog = (date: string, patch: Partial<DiaryLog>) => {
+    if (!userId) return;
+    setLogs((prev) => {
+      const next = { ...prev, [date]: { ...(prev[date] || emptyLog(date)), ...patch } };
+      saveLogs(userId, next);
+      return next;
+    });
+  };
+
+  const applyRoutine = (r: UserRoutine) => {
+    if (!userId) return;
+    setRoutine(r);
+    saveRoutine(userId, r);
+  };
+
+  const applyScanRoutine = (scan?: SkinScanItem) => {
+    const s = scan || [...skinHistory].sort((a, b) => b.timestamp - a.timestamp)[0];
+    if (!s) return;
+    applyRoutine(routineFromScan(s));
+    setRoutineSource(s.id);
+  };
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -311,10 +382,83 @@ const App: React.FC = () => {
         if (!item) return null;
         return (
           <Sheet key={key} onClose={close} label={t('skinCheck')}>
-            <SkinResult t={t} rtl={rtl} item={item} onClose={close} onCheckAgain={() => replaceTop({ k: 'scanner', mode: 'skin' })} />
+            <SkinResult
+              t={t}
+              rtl={rtl}
+              item={item}
+              previous={[...skinHistory].filter((x) => x.timestamp < item.timestamp).sort((a, b) => b.timestamp - a.timestamp)[0]}
+              routineSaved={routineSource === item.id}
+              onClose={close}
+              onCheckAgain={() => replaceTop({ k: 'scanner', mode: 'skin' })}
+              onUseRoutine={() => applyScanRoutine(item)}
+            />
           </Sheet>
         );
       }
+      case 'routineEdit':
+        return (
+          <Sheet key={key} onClose={close} label={t('routineEdit')}>
+            <RoutineEditor
+              t={t}
+              rtl={rtl}
+              initial={routine}
+              latestScan={[...skinHistory].sort((a, b) => b.timestamp - a.timestamp)[0]}
+              fromScan={routineFromScan}
+              onSave={(r) => {
+                applyRoutine(r);
+                close();
+              }}
+              onClose={close}
+            />
+          </Sheet>
+        );
+      case 'goals':
+        return (
+          <Sheet key={key} onClose={close} height="auto" label={t('goalsTitle')}>
+            <GoalsSheet
+              t={t}
+              initial={prefs.goals}
+              onSave={(goals) => {
+                const p = { ...prefs, goals };
+                setPrefs(p);
+                if (userId) savePrefs(userId, p);
+                close();
+              }}
+            />
+          </Sheet>
+        );
+      case 'compare': {
+        const a = skinHistory.find((s) => s.id === o.a);
+        const b = skinHistory.find((s) => s.id === o.b);
+        if (!a || !b) return null;
+        const fmt = (ts: number) => new Intl.DateTimeFormat(lang === AppLanguage.ZH ? 'zh-CN' : lang, { day: 'numeric', month: 'short' }).format(ts);
+        return (
+          <Sheet key={key} onClose={close} label={t('compareTitle')}>
+            <CompareView t={t} rtl={rtl} a={a} b={b} formatDate={fmt} onClose={close} />
+          </Sheet>
+        );
+      }
+      case 'products':
+        return (
+          <Sheet key={key} onClose={close} label={t('productScans')}>
+            <div className="flex-1 overflow-y-auto no-scrollbar">
+              <NavBar onClose={close} backLabel={t('back')} closeLabel={t('close')} rtl={rtl} />
+              <div>
+                <LibraryView
+                  t={t}
+                  history={history}
+                  skinHistory={[]}
+                  signedIn={!!userId}
+                  onOpenProduct={(item) => open({ k: 'product', id: item.id })}
+                  onOpenSkin={() => {}}
+                  onToggleFavorite={toggleFavorite}
+                  onScan={() => replaceTop({ k: 'scanner', mode: 'product' })}
+                  embedded
+                />
+              </div>
+            </div>
+          </Sheet>
+        );
       case 'article':
         return (
           <PushPage key={key} onBack={close} rtl={rtl} label={o.article.title}>
@@ -428,22 +572,32 @@ const App: React.FC = () => {
                 onScan={startScan}
                 onOpenProduct={(item) => open({ k: 'product', id: item.id })}
                 onOpenSkin={(item) => open({ k: 'skin', id: item.id })}
-                onSeeAll={() => setTab('library')}
+                onSeeAll={() => setTab('diary')}
                 onFeeling={() => open({ k: 'onboarding', mode: 'symptoms' })}
                 onProfile={() => setTab('profile')}
               />
             )}
             {tab === 'explore' && <ExploreView t={t} user={user} onOpen={(a) => open({ k: 'article', article: a })} />}
-            {tab === 'library' && (
-              <LibraryView
+            {tab === 'diary' && (
+              <DiaryView
                 t={t}
-                history={history}
-                skinHistory={skinHistory}
+                rtl={rtl}
+                lang={lang}
                 signedIn={!!userId}
-                onOpenProduct={(item) => open({ k: 'product', id: item.id })}
+                scans={skinHistory}
+                logs={logs}
+                routine={routine}
+                prefs={prefs}
+                productCount={history.length}
+                onCheckSkin={() => startScan('skin')}
                 onOpenSkin={(item) => open({ k: 'skin', id: item.id })}
-                onToggleFavorite={toggleFavorite}
-                onScan={() => startScan('product')}
+                onUpdateLog={updateLog}
+                onEditRoutine={() => open({ k: 'routineEdit' })}
+                onUseScanRoutine={() => applyScanRoutine()}
+                onEditGoals={() => open({ k: 'goals' })}
+                onCompare={(x, y) => open({ k: 'compare', a: x.id, b: y.id })}
+                onOpenProducts={() => open({ k: 'products' })}
+                onSignIn={() => open({ k: 'auth', mode: 'signin' })}
               />
             )}
             {tab === 'profile' && (

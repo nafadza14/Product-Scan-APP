@@ -18,6 +18,7 @@ interface Props {
   onOpenSkin: (item: SkinScanItem) => void;
   onToggleFavorite: (id: string) => void;
   onScan: () => void;
+  embedded?: boolean;
 }
 
 type Row = { kind: 'product'; item: ScanHistoryItem; ts: number; score: number } | { kind: 'skin'; item: SkinScanItem; ts: number; score: number };
@@ -25,7 +26,7 @@ type Row = { kind: 'product'; item: ScanHistoryItem; ts: number; score: number }
 const skinScore = (s: SkinScanItem) =>
   Math.round((s.metrics.moisture + s.metrics.firmness + s.metrics.texture + s.metrics.poreVisibility + s.metrics.evenness) / 5);
 
-const LibraryView: React.FC<Props> = ({ t, history, skinHistory, signedIn, onOpenProduct, onOpenSkin, onToggleFavorite, onScan }) => {
+const LibraryView: React.FC<Props> = ({ t, history, skinHistory, signedIn, onOpenProduct, onOpenSkin, onToggleFavorite, onScan, embedded }) => {
   const [filter, setFilter] = useState<Filter>('all');
   const [sort, setSort] = useState<Sort>('recent');
 
@@ -55,9 +56,9 @@ const LibraryView: React.FC<Props> = ({ t, history, skinHistory, signedIn, onOpe
   const total = history.length + skinHistory.length;
 
   return (
-    <div className="pt-safe pb-36">
-      <div className="px-5 pt-3 flex items-end justify-between mb-4">
-        <h1 className="text-[32px] leading-none font-semibold tracking-[-0.02em] text-ink">{t('libraryTitle')}</h1>
+    <div className={embedded ? 'pb-16' : 'pt-safe pb-36'}>
+      <div className={`px-5 flex items-end justify-between mb-4 ${embedded ? 'pt-1' : 'pt-3'}`}>
+        <h1 className={`${embedded ? 'text-[24px]' : 'text-[32px]'} leading-none font-semibold tracking-[-0.02em] text-ink`}>{embedded ? t('productScans') : t('libraryTitle')}</h1>
         {total > 1 && (
           <Segmented
             layoutId="library-sort"

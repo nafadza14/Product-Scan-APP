@@ -5,7 +5,13 @@ import {
   HealthCondition,
   AppLanguage,
   SkinAnalysis,
-  AnalysisError
+  AnalysisError,
+  SkinGoal,
+  SkinZone,
+  SkinZoneId,
+  SkinConcern,
+  ConcernId,
+  Severity
 } from '../types';
 
 // JSON Schema type names (the schemas below are sent to the model inside the prompt).
@@ -79,7 +85,7 @@ ${JSON.stringify(schema)}`;
           }
         ],
         temperature: 0.2,
-        max_tokens: 2500
+        max_tokens: 4000
       })
     });
   } catch (err: any) {
@@ -241,70 +247,137 @@ ${STYLE_RULES}`;
   };
 };
 
-export const analyzeSkin = async (imageBase64: string, userProfile: UserProfile): Promise<SkinAnalysis> => {
+const ZONES = ['forehead', 'tzone', 'leftCheek', 'rightCheek', 'chin', 'underEye'] as const;
+const CONCERNS = ['breakouts', 'redness', 'darkSpots', 'darkCircles', 'fineLines', 'oiliness', 'dryness', 'enlargedPores', 'uneven'] as const;
+const GOAL_TEXT: Record<SkinGoal, string> = {
+  clearBreakouts: 'clear breakouts',
+  evenTone: 'even out skin tone and dark spots',
+  hydration: 'more hydration',
+  calmRedness: 'calm redness and sensitivity',
+  smoothTexture: 'smoother texture',
+  firmness: 'firmer skin and fewer fine lines',
+  minimizePores: 'less visible pores'
+};
+
+export interface SkinContext {
+  goals?: SkinGoal[];
+  /** The previous check, so the model can comment on change. */
+  previous?: { daysAgo: number; skinScore?: number; metrics: SkinAnalysis['metrics']; concerns: string[] };
+  /** Recent diary entries in plain text (sleep, stress, tags). */
+  recentLog?: string;
+  /** What the person currently uses. */
+  routine?: string;
+}
+
+export const analyzeSkin = async (imageBase64: string, userProfile: UserProfile, ctx: SkinContext = {}): Promise<SkinAnalysis> => {
   const language = LANGUAGE_NAMES[userProfile.language] || 'English';
+  const goals = ctx.goals?.length ? ctx.goals.map((g) => GOAL_TEXT[g]).join(', ') : 'not set';
+  const prev = ctx.previous
+    ? `Previous check ${ctx.previous.daysAgo} day(s) ago: skin score ${ctx.previous.skinScore ?? 'n/a'}, metrics ${JSON.stringify(ctx.previous.metrics)}, concerns: ${ctx.previous.concerns.join(', ') || 'none'}.`
+    : 'This is the first check.';
 
   const systemInstruction = `
-You are a cosmetic skin analyst giving gentle, practical skincare guidance from a selfie.
-The person's health profile:
+You are a careful cosmetic skin analyst. You read one selfie and give specific, practical, kind guidance.
+Health profile:
 ${profileSummary(userProfile)}
+Skin goals: ${goals}
+${prev}
+Recent diary: ${ctx.recentLog || 'none'}
+Current routine: ${ctx.routine || 'not shared'}
 
-First decide if the photo shows a human face clearly enough to judge skin. If not, set "faceDetected" to false.
+STEP 1. Photo check. If there is no clear human face, set "faceDetected" false. Otherwise rate the photo:
+- quality.lighting: good, dim, harsh or uneven. quality.sharp and quality.frontal: true or false.
+- quality.confidence 0 to 100: how much the photo supports the scores below. Lower it for filters, makeup, blur or bad light.
 
-Estimate (0 to 100, higher is better for every metric):
-- moisture: how hydrated the skin looks
-- firmness: how firm and smooth contours look
-- texture: how smooth the surface looks
-- poreVisibility: how refined pores look (100 means barely visible pores)
-- evenness: how even the tone looks
+STEP 2. Metrics, 0 to 100, higher always means healthier-looking:
+moisture, firmness, texture, poreVisibility (100 = barely visible pores), evenness.
+skinScore: one overall 0 to 100 number, consistent with the metrics and concerns.
 
-Then:
-- "skinType": one of Dry, Normal, Combination, Oily.
-- "concerns": 2 to 4 short labels (one to three words each) for what you see.
-- "summary": two sentences, kind and specific.
-- "routine": 3 or 4 steps in order (morning and evening). "step" is a short title, "tip" is one sentence.
-- "lookFor" and "avoid": 3 or 4 ingredient names each.
-- Respect the health profile. Pregnancy: never suggest retinoids, high-dose salicylic acid or hydroquinone; put them in "avoid". Cancer care: favor fragrance-free, gentle products.
-- Cosmetic guidance only. Do not diagnose medical conditions. If something looks like it needs a doctor, say so in the summary.
-- All text in ${language}.
+STEP 3. Zones. Score each of: ${ZONES.join(', ')}. Give each a one-sentence note on what you see there (for example "a few small closed comedones near the hairline").
+
+STEP 4. Concerns. For each of ${CONCERNS.join(', ')} give severity 0 (none), 1 (mild), 2 (moderate) or 3 (marked), the zones where you see it, and a one-sentence note. Be specific about location and appearance. Never call anything a disease; describe what is visible.
+
+STEP 5. "concerns": the 2 to 4 most noticeable concerns as short labels.
+"topPriority": the one thing that would help most right now, in one sentence, tied to their goals.
+"summary": three sentences. If there is a previous check, say plainly what improved or got worse and by how much. Link to the diary only when the pattern is clear, and phrase it as a possibility.
+
+STEP 6. Routine: 3 to 4 morning steps (time "am") and 3 to 4 evening steps (time "pm"), in order. Each has "step" (short title), "ingredient" (the key active, or empty), and "tip" (one sentence on how and why for THIS person). Build on their current routine when shared instead of replacing everything.
+"lookFor" and "avoid": 3 to 5 ingredient names each.
+
+RULES:
+- Pregnancy: never suggest retinoids, high-dose salicylic acid or hydroquinone; put them in "avoid". Cancer care: fragrance-free and gentle only.
+- Cosmetic guidance only. If something looks like it needs a doctor (sudden change, bleeding, painful cysts, a changing mole), say so in the summary.
+- All text in ${language}. Zone and concern ids stay in English exactly as listed.
 ${STYLE_RULES}`;
 
+  const num = { type: Type.NUMBER };
   const schema = {
     type: Type.OBJECT,
     properties: {
       faceDetected: { type: Type.BOOLEAN },
-      skinType: { type: Type.STRING, enum: ['Dry', 'Normal', 'Combination', 'Oily'] },
-      metrics: {
+      quality: {
         type: Type.OBJECT,
         properties: {
-          moisture: { type: Type.NUMBER },
-          firmness: { type: Type.NUMBER },
-          texture: { type: Type.NUMBER },
-          poreVisibility: { type: Type.NUMBER },
-          evenness: { type: Type.NUMBER }
-        },
+          lighting: { type: Type.STRING, enum: ['good', 'dim', 'harsh', 'uneven'] },
+          sharp: { type: Type.BOOLEAN },
+          frontal: { type: Type.BOOLEAN },
+          confidence: num
+        }
+      },
+      skinType: { type: Type.STRING, enum: ['Dry', 'Normal', 'Combination', 'Oily'] },
+      skinScore: num,
+      metrics: {
+        type: Type.OBJECT,
+        properties: { moisture: num, firmness: num, texture: num, poreVisibility: num, evenness: num },
         required: ['moisture', 'firmness', 'texture', 'poreVisibility', 'evenness']
       },
+      zones: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: { zone: { type: Type.STRING, enum: [...ZONES] }, score: num, note: { type: Type.STRING } },
+          required: ['zone', 'score', 'note']
+        }
+      },
+      concernDetails: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            id: { type: Type.STRING, enum: [...CONCERNS] },
+            severity: num,
+            zones: { type: Type.ARRAY, items: { type: Type.STRING, enum: [...ZONES] } },
+            note: { type: Type.STRING }
+          },
+          required: ['id', 'severity', 'note']
+        }
+      },
       concerns: { type: Type.ARRAY, items: { type: Type.STRING } },
+      topPriority: { type: Type.STRING },
       summary: { type: Type.STRING },
       routine: {
         type: Type.ARRAY,
         items: {
           type: Type.OBJECT,
-          properties: { step: { type: Type.STRING }, tip: { type: Type.STRING } },
-          required: ['step', 'tip']
+          properties: {
+            time: { type: Type.STRING, enum: ['am', 'pm'] },
+            step: { type: Type.STRING },
+            ingredient: { type: Type.STRING },
+            tip: { type: Type.STRING }
+          },
+          required: ['time', 'step', 'tip']
         }
       },
       lookFor: { type: Type.ARRAY, items: { type: Type.STRING } },
       avoid: { type: Type.ARRAY, items: { type: Type.STRING } }
     },
-    required: ['faceDetected', 'skinType', 'metrics', 'concerns', 'summary', 'routine', 'lookFor', 'avoid']
+    required: ['faceDetected', 'skinType', 'skinScore', 'metrics', 'zones', 'concernDetails', 'concerns', 'summary', 'routine', 'lookFor', 'avoid']
   };
 
   const data = await callModel(
     imageBase64,
     systemInstruction,
-    `Analyze the skin in this selfie and suggest a routine. Answer in ${language}.`,
+    `Analyze the skin in this selfie in detail and update my routine. Answer in ${language}.`,
     schema
   );
 
@@ -312,23 +385,56 @@ ${STYLE_RULES}`;
 
   const list = (v: unknown, max: number) =>
     (Array.isArray(v) ? v : []).map((x) => clean(x)).filter(Boolean).slice(0, max);
+  const isZone = (z: unknown): z is SkinZoneId => typeof z === 'string' && (ZONES as readonly string[]).includes(z);
 
+  const metrics = {
+    moisture: clamp(data.metrics.moisture),
+    firmness: clamp(data.metrics.firmness),
+    texture: clamp(data.metrics.texture),
+    poreVisibility: clamp(data.metrics.poreVisibility),
+    evenness: clamp(data.metrics.evenness)
+  };
+  const avg = Math.round((metrics.moisture + metrics.firmness + metrics.texture + metrics.poreVisibility + metrics.evenness) / 5);
+
+  const zones: SkinZone[] = (Array.isArray(data.zones) ? data.zones : [])
+    .filter((z: any) => isZone(z?.zone))
+    .map((z: any) => ({ zone: z.zone, score: clamp(z.score), note: clean(z.note) }));
+
+  const concernDetails: SkinConcern[] = (Array.isArray(data.concernDetails) ? data.concernDetails : [])
+    .filter((c: any) => (CONCERNS as readonly string[]).includes(c?.id))
+    .map((c: any) => ({
+      id: c.id as ConcernId,
+      severity: Math.max(0, Math.min(3, Math.round(Number(c.severity) || 0))) as Severity,
+      zones: (Array.isArray(c.zones) ? c.zones : []).filter(isZone),
+      note: clean(c.note)
+    }));
+
+  const q = data.quality || {};
   return {
     skinType: ['Dry', 'Normal', 'Combination', 'Oily'].includes(data.skinType) ? data.skinType : 'Normal',
-    metrics: {
-      moisture: clamp(data.metrics.moisture),
-      firmness: clamp(data.metrics.firmness),
-      texture: clamp(data.metrics.texture),
-      poreVisibility: clamp(data.metrics.poreVisibility),
-      evenness: clamp(data.metrics.evenness)
+    skinScore: typeof data.skinScore === 'number' ? clamp(data.skinScore) : avg,
+    metrics,
+    zones,
+    concernDetails,
+    quality: {
+      lighting: ['good', 'dim', 'harsh', 'uneven'].includes(q.lighting) ? q.lighting : 'good',
+      sharp: q.sharp !== false,
+      frontal: q.frontal !== false,
+      confidence: clamp(q.confidence, 70)
     },
+    topPriority: clean(data.topPriority),
     concerns: list(data.concerns, 4),
     summary: clean(data.summary),
     routine: (Array.isArray(data.routine) ? data.routine : [])
-      .slice(0, 4)
-      .map((r: any) => ({ step: clean(r?.step), tip: clean(r?.tip) }))
+      .slice(0, 8)
+      .map((r: any) => ({
+        step: clean(r?.step),
+        tip: clean(r?.tip),
+        ingredient: clean(r?.ingredient) || undefined,
+        time: r?.time === 'pm' ? ('pm' as const) : r?.time === 'am' ? ('am' as const) : undefined
+      }))
       .filter((r: any) => r.step),
-    lookFor: list(data.lookFor, 4),
-    avoid: list(data.avoid, 4)
+    lookFor: list(data.lookFor, 5),
+    avoid: list(data.avoid, 5)
   };
 };

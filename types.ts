@@ -81,24 +81,102 @@ export interface SkinMetrics {
   evenness: number;
 }
 
+/** Facial areas the analysis reports on. */
+export type SkinZoneId = 'forehead' | 'tzone' | 'leftCheek' | 'rightCheek' | 'chin' | 'underEye';
+
+export interface SkinZone {
+  zone: SkinZoneId;
+  score: number; // 0-100, higher is healthier-looking
+  note: string;
+}
+
+export type ConcernId =
+  | 'breakouts'
+  | 'redness'
+  | 'darkSpots'
+  | 'darkCircles'
+  | 'fineLines'
+  | 'oiliness'
+  | 'dryness'
+  | 'enlargedPores'
+  | 'uneven';
+
+export type Severity = 0 | 1 | 2 | 3; // none, mild, moderate, marked
+
+export interface SkinConcern {
+  id: ConcernId;
+  severity: Severity;
+  zones: SkinZoneId[];
+  note: string;
+}
+
 export interface SkinRoutineStep {
   step: string;
   tip: string;
+  /** Which part of the day. Older results have no time and are treated as both. */
+  time?: 'am' | 'pm';
+  ingredient?: string;
+}
+
+export interface PhotoQuality {
+  lighting: 'good' | 'dim' | 'harsh' | 'uneven';
+  sharp: boolean;
+  frontal: boolean;
+  confidence: number; // 0-100
 }
 
 export interface SkinAnalysis {
   skinType: SkinType;
   metrics: SkinMetrics;
+  /** Short labels, kept for older entries and quick display. */
   concerns: string[];
   summary: string;
   routine: SkinRoutineStep[];
   lookFor: string[];
   avoid: string[];
+  // Added in the diary release. Optional so older saved checks still load.
+  skinScore?: number;
+  zones?: SkinZone[];
+  concernDetails?: SkinConcern[];
+  quality?: PhotoQuality;
+  topPriority?: string;
 }
 
 export interface SkinScanItem extends SkinAnalysis {
   id: string;
   timestamp: number;
+  /** Key of the photo thumbnail in IndexedDB on this device. */
+  photoId?: string;
+}
+
+/** One day in the skin diary. Keyed by local date YYYY-MM-DD. */
+export interface DiaryLog {
+  date: string;
+  feeling?: 1 | 2 | 3 | 4 | 5;
+  sleep?: number; // hours
+  water?: number; // glasses
+  stress?: 1 | 2 | 3;
+  tags: string[];
+  note?: string;
+  done: { am: string[]; pm: string[] }; // routine step ids ticked off
+}
+
+export interface RoutineItem {
+  id: string;
+  name: string;
+  product?: string;
+}
+
+export interface UserRoutine {
+  am: RoutineItem[];
+  pm: RoutineItem[];
+  updatedAt: number;
+}
+
+export type SkinGoal = 'clearBreakouts' | 'evenTone' | 'hydration' | 'calmRedness' | 'smoothTexture' | 'firmness' | 'minimizePores';
+
+export interface DiaryPrefs {
+  goals: SkinGoal[];
 }
 
 export interface Article {
