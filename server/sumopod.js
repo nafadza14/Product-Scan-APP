@@ -4,16 +4,37 @@
 const BASE_URL = process.env.SUMOPOD_BASE_URL || 'https://ai.sumopod.com/v1';
 const DEFAULT_MODEL = 'MiniMax-M3.1-Flash-Preview';
 
-export const sumopodConfigured = () => !!process.env.SUMOPOD_API_KEY;
+// Accept a few common spellings, and ignore stray spaces or quotes pasted into the dashboard.
+const KEY_NAMES = ['SUMOPOD_API_KEY', 'VITE_SUMOPOD_API_KEY', 'SUMOPOD_KEY', 'SUMOPOD_APIKEY'];
+const readKey = () => {
+  for (const name of KEY_NAMES) {
+    const v = (process.env[name] || '').trim().replace(/^['"]|['"]$/g, '');
+    if (v) return v;
+  }
+  return '';
+};
+
+export const sumopodConfigured = () => !!readKey();
 
 /** Returns { status, body } where body is a JSON string. */
 export async function handleChat(method, payload) {
   if (method === 'GET') {
-    return { status: 200, body: JSON.stringify({ configured: sumopodConfigured(), model: process.env.SUMOPOD_MODEL || DEFAULT_MODEL }) };
+    // Diagnostics only: names of related variables (never their values) and which Vercel environment this is.
+    const seen = Object.keys(process.env).filter((k) => /sumo|api_key|apikey/i.test(k) && !/^npm_/i.test(k));
+    return {
+      status: 200,
+      body: JSON.stringify({
+        configured: sumopodConfigured(),
+        model: process.env.SUMOPOD_MODEL || DEFAULT_MODEL,
+        environment: process.env.VERCEL_ENV || 'local',
+        deployment: (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7) || null,
+        variablesSeen: seen
+      })
+    };
   }
   if (method !== 'POST') return { status: 405, body: JSON.stringify({ error: 'method_not_allowed' }) };
 
-  const key = process.env.SUMOPOD_API_KEY;
+  const key = readKey();
   if (!key) return { status: 500, body: JSON.stringify({ error: 'missing_key', message: 'SUMOPOD_API_KEY is not set on the server.' }) };
 
   const messages = Array.isArray(payload?.messages) ? payload.messages : null;
