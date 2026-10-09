@@ -1,174 +1,142 @@
+import React, { useMemo, useRef, useState } from 'react';
+import { motion, useScroll, useTransform } from 'framer-motion';
+import { ChevronLeft, Share2, Check } from 'lucide-react';
+import { Article, UserProfile } from '../types';
+import { Translator, TranslationKey, conditionLabel } from '../i18n';
+import { getDailyFeed, FALLBACK_IMAGE } from '../services/articleService';
+import { IconButton, Pressable } from './ui';
 
-import React, { useState, useEffect } from 'react';
-import { Sparkles, BookOpen, Clock, ChevronLeft, Share2, Bookmark, ExternalLink } from 'lucide-react';
-import { UserProfile, Article } from '../types';
-import Card from './Card';
-import { getDailyFeed, getDeterministicImage } from '../services/articleService';
+const catKey: Record<Article['category'], TranslationKey> = {
+  Nutrition: 'catNutrition',
+  Skin: 'catSkin',
+  Labels: 'catLabels',
+  Wellness: 'catWellness'
+};
 
-interface ExploreViewProps {
-  userProfile: UserProfile | null;
-  translations: any;
-}
+const onImgError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+  if (e.currentTarget.src !== FALLBACK_IMAGE) e.currentTarget.src = FALLBACK_IMAGE;
+};
 
-const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1499209974431-2761e2523676?auto=format&fit=crop&w=800&q=80";
-
-const ExploreView: React.FC<ExploreViewProps> = ({ userProfile, translations: t }) => {
-  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
-  const [articles, setArticles] = useState<Article[]>([]);
-
-  useEffect(() => {
-    const feed = getDailyFeed(userProfile);
-    setArticles(feed);
-  }, [userProfile]);
-
-  const displayCondition = userProfile?.customConditionName || userProfile?.condition || "General Health";
-
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-      e.currentTarget.src = FALLBACK_IMAGE;
-  };
-
-  if (selectedArticle) {
-    const heroImage = getDeterministicImage(selectedArticle);
-    
-    return (
-      <div className="fixed inset-0 z-50 bg-white overflow-y-auto animate-in slide-in-from-bottom-10 flex flex-col no-scrollbar">
-        <div className="relative h-72 sm:h-80 w-full flex-shrink-0 bg-gray-100">
-          <img 
-            src={heroImage} 
-            alt={selectedArticle.title} 
-            referrerPolicy="no-referrer"
-            onError={handleImageError}
-            className="w-full h-full object-cover object-center"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-transparent"></div>
-          
-          <div className="absolute top-0 left-0 right-0 p-6 pt-12 flex justify-between items-center text-white">
-            <button 
-              onClick={() => setSelectedArticle(null)}
-              className="p-2 bg-white/20 backdrop-blur-md rounded-full hover:bg-white/30 transition-colors"
-            >
-              <ChevronLeft size={24} />
-            </button>
-            <div className="flex gap-3">
-              <button className="p-2 bg-white/20 backdrop-blur-md rounded-full hover:bg-white/30 transition-colors">
-                <Bookmark size={20} />
-              </button>
-              <button 
-                 onClick={() => {
-                     if (navigator.share) {
-                         navigator.share({ title: selectedArticle.title, url: window.location.href }).catch(console.error);
-                     }
-                 }}
-                 className="p-2 bg-white/20 backdrop-blur-md rounded-full hover:bg-white/30 transition-colors"
-              >
-                <Share2 size={20} />
-              </button>
-            </div>
-          </div>
-
-          <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white/90 to-transparent">
-             <span className="inline-block px-3 py-1 bg-[#6FAE9A] text-white text-xs font-bold rounded-md mb-3 shadow-md uppercase tracking-wider">
-               {selectedArticle.category}
-             </span>
-             <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1C1C1C] leading-tight shadow-sm">
-                {selectedArticle.title}
-             </h1>
-          </div>
-        </div>
-
-        <div className="px-6 py-4 pb-32 max-w-2xl mx-auto w-full">
-          <div className="flex items-center justify-between text-sm text-gray-400 mb-8 border-b border-gray-100 pb-4">
-             <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-[#6FAE9A] overflow-hidden flex items-center justify-center text-xs font-bold text-white shadow-sm">VS</div>
-                <span className="font-bold text-gray-700">{selectedArticle.source}</span>
-             </div>
-             <div className="flex items-center gap-3">
-                <span>{selectedArticle.date}</span>
-                <span className="w-1 h-1 rounded-full bg-gray-300"></span>
-                <span className="flex items-center gap-1"><Clock size={12} /> {selectedArticle.readTime}</span>
-             </div>
-          </div>
-
-          <div className="prose prose-lg prose-green mx-auto">
-             {selectedArticle.content.map((paragraph, index) => (
-               <p key={index} className="text-gray-700 leading-relaxed mb-6 font-medium text-lg text-justify">
-                 {paragraph}
-               </p>
-             ))}
-          </div>
-          
-          {selectedArticle.sourceUrl && selectedArticle.sourceUrl !== "#" && selectedArticle.sourceUrl !== "" && (
-            <div className="mt-8 mb-4">
-                <a href={selectedArticle.sourceUrl} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 w-full py-4 bg-gray-100 rounded-xl text-gray-600 font-bold hover:bg-gray-200 transition-colors">
-                    Read Original Source <ExternalLink size={16} />
-                </a>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
+export const ExploreView: React.FC<{ t: Translator; user: UserProfile | null; onOpen: (a: Article) => void }> = ({ t, user, onOpen }) => {
+  const articles = useMemo(() => getDailyFeed(user), [user]);
+  const [featured, ...rest] = articles;
 
   return (
-    <div className="p-6 pt-12 animate-in fade-in duration-500 pb-32">
-        <div className="mb-8">
-            <h2 className="text-3xl font-extrabold text-[#1C1C1C] tracking-tight">Explore</h2>
-            <div className="flex justify-between items-end">
-                <p className="text-gray-500 font-medium mt-1">{t.nowShowing} <span className="text-[#6FAE9A] font-bold">{displayCondition}</span></p>
-                <span className="text-[10px] font-bold text-gray-300 uppercase bg-gray-50 px-2 py-1 rounded-md border border-gray-100">{t.updatedToday}</span>
-            </div>
-        </div>
+    <div className="px-5 pt-safe pb-36">
+      <div className="pt-3 mb-5">
+        <h1 className="text-[32px] leading-none font-semibold tracking-[-0.02em] text-ink">{t('exploreTitle')}</h1>
+        <p className="text-[16px] text-ink-muted mt-2">{t('exploreSub', { condition: conditionLabel(t, user) })}</p>
+      </div>
 
-        <div className="space-y-8">
-          {articles.length > 0 && (
-            <div onClick={() => setSelectedArticle(articles[0])} className="relative group cursor-pointer transform hover:scale-[1.01] transition-transform duration-300">
-               <div className="absolute inset-0 bg-[#6FAE9A] rounded-3xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity"></div>
-               <div className="relative h-80 rounded-3xl overflow-hidden shadow-2xl bg-gray-200">
-                  <img src={getDeterministicImage(articles[0])} alt="Trending" referrerPolicy="no-referrer" loading="lazy" onError={handleImageError} className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-                  <div className="absolute top-6 left-6 flex items-center gap-2">
-                      <div className="bg-white/20 backdrop-blur-md p-1.5 rounded-lg"><Sparkles size={16} className="text-yellow-300 fill-yellow-300" /></div>
-                      <span className="text-xs font-bold text-white bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-lg tracking-widest uppercase border border-white/10">{t.topStory}</span>
-                  </div>
-                  <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                      <h3 className="font-bold text-2xl mb-3 leading-tight line-clamp-2">{articles[0].title}</h3>
-                      <p className="text-sm opacity-90 mb-4 font-medium leading-relaxed line-clamp-2 text-gray-200">{articles[0].summary}</p>
-                      <button className="text-xs font-bold bg-white text-[#1C1C1C] px-5 py-3 rounded-xl shadow-lg hover:bg-gray-100 transition-colors">Read Full Article</button>
-                  </div>
-               </div>
+      {featured && (
+        <Pressable onClick={() => onOpen(featured)} className="block w-full text-start mb-8">
+          <div className="relative h-[340px] rounded-[28px] overflow-hidden bg-sage">
+            <img src={featured.image} alt="" onError={onImgError} referrerPolicy="no-referrer" className="absolute inset-0 w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/20 to-transparent" />
+            <div className="absolute top-4 start-4 h-8 px-3 rounded-full bg-white/85 backdrop-blur text-ink text-[13px] font-semibold inline-flex items-center">
+              {t('featured')}
             </div>
-          )}
+            <div className="absolute bottom-0 inset-x-0 p-5 text-white">
+              <p className="text-[13px] text-white/75 mb-1.5">
+                {t(catKey[featured.category])}, {t('minRead', { n: featured.readTime })}
+              </p>
+              <h2 className="text-[24px] leading-[1.15] font-semibold tracking-[-0.01em] mb-2">{featured.title}</h2>
+              <p className="text-[15px] text-white/80 leading-snug line-clamp-2">{featured.summary}</p>
+            </div>
+          </div>
+        </Pressable>
+      )}
 
-          {articles.length > 1 && (
-              <div>
-                <div className="flex items-center gap-2 mb-4 px-2">
-                    <BookOpen size={20} className="text-[#6FAE9A]" />
-                    <h3 className="font-bold text-lg text-[#1C1C1C]">{t.todaysRead}</h3>
-                </div>
-                <div className="space-y-4">
-                    {articles.slice(1).map((article) => (
-                    <Card key={article.id} variant="standard" onClick={() => setSelectedArticle(article)} className="flex gap-4 items-stretch p-3 hover:shadow-xl hover:border-[#6FAE9A]/30 group transition-all duration-300 !rounded-2xl cursor-pointer">
-                        <div className="w-28 h-28 rounded-xl bg-gray-200 overflow-hidden flex-shrink-0 relative shadow-inner">
-                            <img src={getDeterministicImage(article)} alt="" referrerPolicy="no-referrer" loading="lazy" onError={handleImageError} className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700" />
-                        </div>
-                        <div className="flex-1 py-1 flex flex-col justify-between">
-                            <div>
-                                <span className="text-[10px] font-bold text-[#6FAE9A] uppercase tracking-wider bg-[#6FAE9A]/10 px-2 py-0.5 rounded-md inline-block mb-2">{article.category}</span>
-                                <h4 className="font-bold text-base text-gray-800 leading-snug group-hover:text-[#6FAE9A] transition-colors line-clamp-2">{article.title}</h4>
-                            </div>
-                            <div className="flex items-center justify-between text-xs text-gray-400 font-medium mt-2">
-                                <span className="flex items-center gap-1"><Clock size={10} /> {article.readTime}</span>
-                                <span className="font-bold text-gray-300">{article.source}</span>
-                            </div>
-                        </div>
-                    </Card>
-                    ))}
-                </div>
+      <h3 className="text-[20px] font-semibold text-ink mb-3">{t('moreReads')}</h3>
+      <div className="space-y-3">
+        {rest.map((a) => (
+          <Pressable key={a.id} onClick={() => onOpen(a)} className="w-full rounded-3xl bg-white p-3 flex gap-3.5 text-start shadow-soft">
+            <div className="w-[92px] h-[92px] rounded-2xl overflow-hidden bg-sage shrink-0">
+              <img src={a.image} alt="" loading="lazy" onError={onImgError} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
             </div>
-          )}
-        </div>
+            <span className="flex-1 min-w-0 py-1">
+              <span className="block text-[13px] text-ink-muted mb-1">
+                {t(catKey[a.category])}, {t('minRead', { n: a.readTime })}
+              </span>
+              <span className="block text-[16px] font-semibold text-ink leading-snug line-clamp-3">{a.title}</span>
+            </span>
+          </Pressable>
+        ))}
+      </div>
     </div>
   );
 };
 
-export default ExploreView;
+export const ArticlePage: React.FC<{ t: Translator; rtl: boolean; article: Article; onBack: () => void }> = ({ t, rtl, article, onBack }) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const { scrollY } = useScroll({ container: scrollRef });
+  const imgY = useTransform(scrollY, [0, 300], [0, 90]);
+  const imgScale = useTransform(scrollY, [-150, 0], [1.25, 1]);
+  const barOpacity = useTransform(scrollY, [200, 260], [0, 1]);
+  const [copied, setCopied] = useState(false);
+
+  const share = async () => {
+    const data = { title: article.title, text: article.summary, url: window.location.origin };
+    try {
+      if (navigator.share) await navigator.share(data);
+      else {
+        await navigator.clipboard.writeText(`${article.title}\n${window.location.origin}`);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1600);
+      }
+    } catch { /* dismissed */ }
+  };
+
+  return (
+    <div ref={scrollRef} className="h-full overflow-y-auto no-scrollbar bg-canvas">
+      {/* Floating controls */}
+      <div className="fixed top-0 inset-x-0 z-30 flex justify-center pointer-events-none">
+        <div className="relative w-full max-w-[450px] px-5 pt-safe pb-3 flex items-center justify-between pointer-events-auto">
+          <motion.div className="absolute inset-0 blur-bar" style={{ opacity: barOpacity }} />
+          <IconButton tone="light" label={t('back')} onClick={onBack} className="relative">
+            <ChevronLeft size={22} className={rtl ? 'rotate-180' : ''} />
+          </IconButton>
+          <motion.p className="relative text-[16px] font-semibold text-ink truncate px-3" style={{ opacity: barOpacity }}>
+            {article.title}
+          </motion.p>
+          <IconButton tone="light" label={copied ? t('linkCopied') : t('share')} onClick={share} className="relative">
+            {copied ? <Check size={19} /> : <Share2 size={19} />}
+          </IconButton>
+        </div>
+      </div>
+
+      <div className="relative h-[380px] overflow-hidden bg-sage">
+        <motion.img
+          src={article.image}
+          alt=""
+          onError={onImgError}
+          referrerPolicy="no-referrer"
+          className="absolute inset-0 w-full h-full object-cover origin-bottom"
+          style={{ y: imgY, scale: imgScale }}
+        />
+        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-canvas to-transparent" />
+      </div>
+
+      <motion.article
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        className="relative -mt-10 px-6 pb-24"
+      >
+        <p className="text-[14px] text-ink-muted mb-2">
+          {t(catKey[article.category])}, {t('minRead', { n: article.readTime })}
+        </p>
+        <h1 className="text-[30px] leading-[1.12] font-semibold tracking-[-0.02em] text-ink mb-4">{article.title}</h1>
+        <p className="text-[18px] leading-relaxed text-ink-soft mb-6">{article.summary}</p>
+        <div className="space-y-5 max-w-[62ch]">
+          {article.content.map((p, i) => (
+            <p key={i} className="text-[17px] leading-[1.65] text-ink">
+              {p}
+            </p>
+          ))}
+        </div>
+        <p className="text-[13px] text-ink-faint leading-relaxed mt-10">{t('disclaimer')}</p>
+      </motion.article>
+    </div>
+  );
+};

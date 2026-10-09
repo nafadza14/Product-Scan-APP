@@ -1,199 +1,236 @@
-import { Article, HealthCondition, UserProfile } from "../types";
+import { AppLanguage, Article, HealthCondition, UserProfile } from '../types';
 
-// --- DATA POOLS FOR GENERATION ---
+const img = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&q=75`;
 
-// Verified, reliable Unsplash IDs
-export const IMAGE_MAP: Record<string, string[]> = {
-  'Nutrition': [
-    "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80", // Healthy food bowl
-    "https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=800&q=80", // Avocado toast
-    "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80", // Salad
-    "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=800&q=80", // Vegetables
-    "https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=800&q=80", // Fresh produce
-    "https://images.unsplash.com/photo-1493770348161-369560ae357d?auto=format&fit=crop&w=800&q=80", // Breakfast
-    "https://images.unsplash.com/photo-1505253758473-96b701d36dec?auto=format&fit=crop&w=800&q=80"  // Smoothies
-  ],
-  'Wellness': [
-    "https://images.unsplash.com/photo-1544367563-12123d8965cd?auto=format&fit=crop&w=800&q=80", // Yoga
-    "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=800&q=80", // Meditation
-    "https://images.unsplash.com/photo-1511632765486-a01980e01a18?auto=format&fit=crop&w=800&q=80", // Relaxing tea
-    "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&fit=crop&w=800&q=80", // Fitness
-    "https://images.unsplash.com/photo-1499209974431-2761e2523676?auto=format&fit=crop&w=800&q=80", // Nature calm
-    "https://images.unsplash.com/photo-1520333789090-1afc82db536a?auto=format&fit=crop&w=800&q=80"  // Spa
-  ],
-  'Medical': [
-    "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=800&q=80", // Stethoscope
-    "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=800&q=80", // Medical science
-    "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=800&q=80", // Doctor consultation
-    "https://images.unsplash.com/photo-1584362917165-526a968579e8?auto=format&fit=crop&w=800&q=80", // Lab
-    "https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?auto=format&fit=crop&w=800&q=80"  // Health tech
-  ],
-  'Pregnancy': [
-    "https://images.unsplash.com/photo-1519689680058-324335c77eba?auto=format&fit=crop&w=800&q=80", // Mother holding belly
-    "https://images.unsplash.com/photo-1555820585-c5ae44394b79?auto=format&fit=crop&w=800&q=80", // Baby shoes
-    "https://images.unsplash.com/photo-1531983412531-1f49a365ffed?auto=format&fit=crop&w=800&q=80", // Baby
-    "https://images.unsplash.com/photo-1492462543947-040389c4a66c?auto=format&fit=crop&w=800&q=80", // Newborn
-    "https://images.unsplash.com/photo-1628173549727-2c525f0e1f7c?auto=format&fit=crop&w=800&q=80"  // Parenting
-  ],
-  'General': [
-    "https://images.unsplash.com/photo-1505576399279-565b52d4ac71?auto=format&fit=crop&w=800&q=80", // General nature
-    "https://images.unsplash.com/photo-1490818387583-1baba5e638af?auto=format&fit=crop&w=800&q=80", // Healthy lifestyle
-    "https://images.unsplash.com/photo-1447452001602-7090c774637d?auto=format&fit=crop&w=800&q=80", // Sun
-    "https://images.unsplash.com/photo-1550989460-0adf9ea622e2?auto=format&fit=crop&w=800&q=80"  // Coffee/Book
-  ]
-};
+type Localized = { title: string; summary: string; content: string[] };
+type Source = Omit<Article, 'title' | 'summary' | 'content'> & { en: Localized; idn?: Localized };
 
-const TITLE_TEMPLATES = {
-  'Nutrition': {
-    prefixes: ["The Science of", "Understanding", "The Truth About", "A Daily Guide to", "Optimizing Your", "Secrets of", "Why You Need", "Mastering", "Essential Tips for", "Unlocking"],
-    topics: ["Macronutrients", "Gut Health", "Fiber Intake", "Hydration", "Plant-Based Proteins", "Healthy Fats", "Sugar Reduction", "Meal Timing", "Micronutrients", "Metabolic Health", "Superfoods", "Dietary Fiber", "Probiotics", "Electrolytes", "Antioxidants"],
-    suffixes: ["for Better Energy", "Explained", "in Modern Life", "for Longevity", "Step by Step", "Today", "for Your Body", "Research Updates", "Deep Dive", "and You"]
-  },
-  'Wellness': {
-    prefixes: ["The Art of", "Prioritizing", "Building", "Strategies for", "The Power of", "Daily Habits for", "Transforming Your", "A New Approach to", "Understanding", "Balancing"],
-    topics: ["Sleep Quality", "Stress Management", "Mindfulness", "Daily Movement", "Mental Clarity", "Digital Detox", "Morning Routines", "Evening Wind-downs", "Emotional Resilience", "Breathwork", "Nature Therapy", "Social Connection", "Self-Care", "Hydration Habits", "Focus"],
-    suffixes: ["for Inner Peace", "in a Busy World", "Made Simple", "for Beginners", "for Mental Health", "Every Day", "at Home", "for Success", "Lifestyle Guide"]
-  },
-  'Medical': {
-    prefixes: ["Recent Advances in", "Managing", "Living With", "The Biology of", "Preventing", "Doctor's Advice on", "Research Updates on", "Navigating", "Understanding Symptoms of", "Treatment Options for"],
-    topics: ["Autoimmune Responses", "Chronic Inflammation", "Heart Health", "Immune System Function", "Hormonal Balance", "Blood Sugar Control", "Joint Health", "Allergy Management", "Digestive Disorders", "Respiratory Health", "Skin Barrier Function", "Metabolic Syndrome", "Vitamin Deficiencies", "Pain Management"],
-    suffixes: ["Safely", "Effectively", "According to Science", "in 2024", "Explained by Experts", "Without Stress", "Patient Guide", "Clinical Review", "Breakthroughs"]
-  },
-  'Pregnancy': {
-    prefixes: ["Navigating", "The Joy of", "Safe Guide to", "Understanding", "Preparing for", "Nutrition During", "Wellness for", "The Trimesters of", "Postpartum", "Exercise During"],
-    topics: ["First Trimester", "Baby Development", "Maternal Nutrition", "Prenatal Vitamins", "Safe Skincare", "Labor Prep", "Sleep Positions", "Morning Sickness", "Cravings", "Hospital Bags", "Breastfeeding Prep", "Pelvic Floor Health", "Emotional Changes", "Partner Support"],
-    suffixes: ["for New Moms", "Week by Week", "Made Easy", "Safely", "for a Healthy Baby", "With Confidence", "Survival Guide", "Expert Tips", "Mom-to-Be"]
-  },
-  'General': {
-    prefixes: ["Daily Insight:", "The Basics of", "Improving Your", "Simple Steps to", "Why You Should Consider", "A Guide to", "Healthy Habits for", "Understanding", "The Benefits of", "Life Hacks for"],
-    topics: ["Hydration", "Walking", "Balanced Diet", "Better Sleep", "Routine", "Fresh Air", "Mindfulness", "Stretching", "Vitamin D", "Self-Care", "Productivity", "Relaxation", "Immunity", "Energy Levels", "Mental Clarity"],
-    suffixes: ["Today", "Made Easy", "for Beginners", "in 5 Minutes", "for a Better You", "explained", "at Home", "Every Day", "for Success", "Scientifically Proven"]
-  }
-};
-
-const CONTENT_BLOCKS = {
-  intros: [
-    "In the ever-evolving landscape of health and wellness, staying informed is the first line of defense. Today, we delve deep into a topic that affects millions but is often misunderstood. Our editorial team has combed through the latest research to bring you actionable insights.",
-    "Making informed decisions about your body is empowering. This article aims to demystify complex medical concepts and translate them into practical daily habits. Whether you are managing a condition or optimizing your health, understanding the fundamentals is key.",
-    "It is often said that health is wealth, but what does that mean in a practical sense? Today's feature focuses on a critical aspect of well-being that often goes unnoticed until symptoms arise. Let's explore the science and the solutions.",
-    "With so much conflicting advice available online, VitalSense Editorial is committed to providing evidence-based clarity. This piece investigates the core mechanisms of this topic and offers a balanced perspective rooted in recent clinical findings."
-  ],
-  generalBody: [
-    "To understand the bigger picture, we must first look at the biological mechanisms at play. Our bodies are complex adaptive systems, and small changes in our environment or diet can trigger significant physiological responses. Recent studies published in major medical journals highlight this interconnectedness.",
-    "One key factor to consider is the role of consistency. Health is rarely about a single intervention but rather the cumulative effect of daily choices. Experts agree that a holistic approach—considering diet, sleep, and stress—yields the most sustainable results over time.",
-    "Furthermore, individual variability cannot be ignored. What works for one person may not be ideal for another due to genetic and lifestyle differences. This underscores the importance of personalized care and listening to your body's unique signals.",
-    "Let's break down the components. At a cellular level, efficiency is driven by nutrient availability and metabolic flexibility. Ensuring that your body has the right building blocks is essential for repair and energy production.",
-    "Another critical aspect often overlooked is the environmental impact on our biology. From air quality to artificial lighting, modern stressors challenge our ancestral biology. Adapting our lifestyle to mitigate these factors is becoming increasingly important."
-  ],
-  specifics: [
-    "Practically speaking, there are three main strategies to implement immediately. First, prioritize whole, unprocessed inputs wherever possible. Second, establish a regular rhythm for your biological clock by adhering to consistent timing. Third, monitor your body's response and adjust accordingly.",
-    "Nutritionists often recommend a 'food first' approach. Before turning to supplementation, evaluate your dietary intake. Are you getting enough diversity on your plate? Color often indicates nutrient density, so aim for a wide spectrum of vegetables and fruits.",
-    "On the topic of lifestyle, stress reduction is non-negotiable. Chronic elevation of cortisol can dampen immune response and increase inflammation. Simple practices like 4-7-8 breathing or a 10-minute daily walk can reset your nervous system effectively.",
-    "For those managing specific conditions, avoidance of triggers is just as important as the inclusion of beneficial elements. Keep a symptom diary to identify patterns that might otherwise go unnoticed. Data is your most powerful tool in self-advocacy.",
-    "Integration is key. Start by stacking new habits onto existing ones. For example, if you drink coffee every morning, use that time to take your supplements or practice a moment of gratitude. This reduces friction and increases adherence."
-  ],
-  science: [
-    "A 2023 study from the National Institute of Health verified that participants who engaged in these protocols saw a 20% improvement in markers within six weeks. This data supports the hypothesis that lifestyle interventions are powerful adjuncts to traditional medical treatments.",
-    "Researchers have also isolated specific pathways that link gut health to mental well-being in this context. The gut-brain axis is a rapidly expanding field of study, suggesting that what we consume has direct implications for our mood and cognitive function.",
-    "It is worth noting that inflammation is a common denominator in many chronic issues. By addressing the root cause—often dietary or environmental—patients frequently report a reduction in systemic symptoms that extends beyond their primary complaint.",
-    "Meta-analyses of over 50 clinical trials have shown consistent results regarding the efficacy of this approach. While individual results vary, the statistical trend points clearly towards significant benefit for the majority of the population."
-  ],
-  conclusion: [
-    "In conclusion, while the journey to optimal health is personal, the principles remain universal. Knowledge is the precursor to change. By applying the insights shared today, you are taking a proactive step towards a healthier future.",
-    "We hope this deep dive has provided clarity and confidence. Remember, significant transformation happens incrementally. Start with one small change today, and let the momentum build. Your body will thank you.",
-    "As always, VitalSense is here to support your journey. Stay tuned for tomorrow's update where we will tackle another crucial aspect of living well. Until then, prioritize your well-being.",
-    "Final thoughts: Listen to your body, consult with your healthcare provider, and stay curious. The more you understand about your own physiology, the better equipped you are to thrive."
-  ]
-};
-
-// --- GENERATOR LOGIC ---
-
-const getRandomItem = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
-
-const generateLongContent = (category: string, title: string): string[] => {
-  const paragraphs: string[] = [];
-  
-  // 1. Introduction (2 paragraphs)
-  paragraphs.push(getRandomItem(CONTENT_BLOCKS.intros));
-  paragraphs.push(`Specifically regarding "${title}", early adoption of these principles can prevent long-term complications. We are seeing a shift in medical consensus towards proactive management.`);
-
-  // 2. Body: Context (3 paragraphs)
-  paragraphs.push(...CONTENT_BLOCKS.generalBody.sort(() => 0.5 - Math.random()).slice(0, 3));
-
-  // 3. Body: Advice & Specifics (4 paragraphs)
-  paragraphs.push(`When we analyze ${category.toLowerCase()} through this lens, several actionable points emerge.`);
-  paragraphs.push(...CONTENT_BLOCKS.specifics.sort(() => 0.5 - Math.random()).slice(0, 3));
-
-  // 4. Body: Science (3 paragraphs)
-  paragraphs.push(...CONTENT_BLOCKS.science.sort(() => 0.5 - Math.random()).slice(0, 3));
-
-  // 5. Conclusion (2 paragraphs)
-  paragraphs.push(...CONTENT_BLOCKS.conclusion.sort(() => 0.5 - Math.random()).slice(0, 2));
-
-  return paragraphs;
-};
-
-// Deterministic Image Helper
-export const getDeterministicImage = (article: Article): string => {
-    const images = IMAGE_MAP[article.category] || IMAGE_MAP['General'];
-    // Simple hash from ID string to number
-    let hash = 0;
-    for (let i = 0; i < article.id.length; i++) {
-        hash = article.id.charCodeAt(i) + ((hash << 5) - hash);
+// Evergreen, plain-language guides. No invented studies or statistics.
+const SOURCES: Source[] = [
+  {
+    id: 'read-an-ingredient-list',
+    category: 'Labels',
+    readTime: 4,
+    image: img('photo-1542838132-92c53300491e'),
+    en: {
+      title: 'How to read an ingredient list in 30 seconds',
+      summary: 'Ingredients are listed by weight. The first three tell you most of the story.',
+      content: [
+        'Ingredient lists are ordered by weight, from most to least. Whatever appears first makes up the biggest share of the product. If sugar, refined flour or oil sits in the first three spots, that is what you are mostly buying.',
+        'Sugar hides under many names: glucose syrup, dextrose, maltodextrin, cane juice, fruit concentrate and honey all count. When several of them appear separately, the total can be higher than any single entry suggests.',
+        'A short list is not automatically healthier, but a long list full of words you cannot picture in a kitchen usually means a highly processed product.',
+        'Check the allergen statement last. "Contains" lists what is in the recipe. "May contain" means the product was made near that allergen, which matters if your allergy is severe.'
+      ]
+    },
+    idn: {
+      title: 'Cara membaca daftar komposisi dalam 30 detik',
+      summary: 'Komposisi diurutkan berdasarkan berat. Tiga teratas sudah menceritakan banyak hal.',
+      content: [
+        'Daftar komposisi diurutkan berdasarkan berat, dari yang terbanyak. Bahan yang muncul pertama adalah porsi terbesar produk. Jika gula, tepung olahan atau minyak ada di tiga teratas, itulah yang sebagian besar kamu beli.',
+        'Gula punya banyak nama: sirup glukosa, dekstrosa, maltodekstrin, sari tebu, konsentrat buah dan madu. Jika beberapa muncul terpisah, totalnya bisa lebih tinggi dari yang terlihat.',
+        'Daftar yang pendek belum tentu lebih sehat, tapi daftar panjang berisi nama yang tidak kamu kenal di dapur biasanya menandakan produk olahan tinggi.',
+        'Cek pernyataan alergen di akhir. "Mengandung" berarti ada di resep. "Dapat mengandung" berarti diproduksi dekat alergen tersebut, penting jika alergimu berat.'
+      ]
     }
-    const index = Math.abs(hash) % images.length;
-    return images[index];
-};
-
-const generateArticlesForCategory = (category: string, count: number): Article[] => {
-  const templates = TITLE_TEMPLATES[category as keyof typeof TITLE_TEMPLATES] || TITLE_TEMPLATES['General'];
-  const articles: Article[] = [];
-  
-  for (let i = 0; i < count; i++) {
-    const prefix = getRandomItem(templates.prefixes);
-    const topic = getRandomItem(templates.topics);
-    const suffix = getRandomItem(templates.suffixes);
-    const title = `${prefix} ${topic} ${suffix}`;
-    
-    // Create unique ID with random component to ensure better hash distribution
-    // NOTE: Using a cleaner ID format to avoid issues
-    const id = `${category.toLowerCase()}-${i}-${Date.now()}`;
-
-    articles.push({
-      id: id,
-      title: title,
-      category: category,
-      source: "VitalSense Editorial",
-      sourceUrl: "", // Internal content only
-      date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-      readTime: `${Math.floor(Math.random() * 4) + 6} min`, // 6-10 min read
-      summary: `A comprehensive guide exploring the nuances of ${topic.toLowerCase()} and how it impacts your daily ${category.toLowerCase()} journey.`,
-      content: generateLongContent(category, title)
-    });
+  },
+  {
+    id: 'nutri-score-explained',
+    category: 'Nutrition',
+    readTime: 3,
+    image: img('photo-1512621776951-a57141f2eefd'),
+    en: {
+      title: 'Nutri-Score, explained simply',
+      summary: 'A to E grades compare products in the same aisle. Here is what they leave out.',
+      content: [
+        'Nutri-Score grades a food from A (dark green) to E (red) based on its nutrients per 100 g. Sugar, salt, saturated fat and calories pull the grade down. Fiber, protein, fruit, vegetables and nuts pull it up.',
+        'It works best for comparing similar products, like two breakfast cereals. Comparing a cereal to an olive oil with it is less useful.',
+        'It does not know about you. A B-graded product can still contain an ingredient you need to avoid. That is why VitalSense shows a personal score next to the Nutri-Score.'
+      ]
+    },
+    idn: {
+      title: 'Nutri-Score, dijelaskan dengan sederhana',
+      summary: 'Nilai A sampai E membandingkan produk sejenis. Ini yang tidak dihitungnya.',
+      content: [
+        'Nutri-Score menilai makanan dari A (hijau tua) sampai E (merah) berdasarkan nutrisi per 100 g. Gula, garam, lemak jenuh dan kalori menurunkan nilai. Serat, protein, buah, sayur dan kacang menaikkannya.',
+        'Paling berguna untuk membandingkan produk sejenis, misalnya dua sereal sarapan. Kurang berguna untuk membandingkan sereal dengan minyak zaitun.',
+        'Nutri-Score tidak mengenal kondisimu. Produk bernilai B tetap bisa mengandung bahan yang perlu kamu hindari. Karena itu VitalSense menampilkan skor personal di samping Nutri-Score.'
+      ]
+    }
+  },
+  {
+    id: 'pregnancy-skincare',
+    category: 'Skin',
+    readTime: 4,
+    image: img('photo-1519689680058-324335c77eba'),
+    conditions: [HealthCondition.PREGNANCY],
+    en: {
+      title: 'Skincare ingredients to pause during pregnancy',
+      summary: 'A short list to check against your shelf, and gentler swaps.',
+      content: [
+        'Doctors commonly advise pausing retinoids during pregnancy. On labels they appear as retinol, retinyl palmitate, retinal, tretinoin or adapalene.',
+        'High-strength salicylic acid peels and hydroquinone are also usually avoided. Low-strength salicylic acid in a rinse-off cleanser is often considered fine, but ask your doctor.',
+        'Gentler options many people use instead: azelaic acid for breakouts and dark spots, niacinamide for oil and redness, and mineral sunscreen with zinc oxide.',
+        'Bring the products you use to your next appointment. A quick look from your doctor or midwife beats guessing.'
+      ]
+    },
+    idn: {
+      title: 'Bahan skincare yang sebaiknya dijeda saat hamil',
+      summary: 'Daftar singkat untuk dicek di rak skincare-mu, plus alternatif yang lebih lembut.',
+      content: [
+        'Dokter umumnya menyarankan menjeda retinoid saat hamil. Di label, namanya bisa retinol, retinyl palmitate, retinal, tretinoin atau adapalene.',
+        'Peeling asam salisilat konsentrasi tinggi dan hidrokuinon juga biasanya dihindari. Asam salisilat dosis rendah di sabun cuci muka sering dianggap aman, tapi tanyakan ke doktermu.',
+        'Alternatif yang lebih lembut: asam azelat untuk jerawat dan noda, niacinamide untuk minyak dan kemerahan, serta sunscreen mineral dengan zinc oxide.',
+        'Bawa produkmu saat kontrol berikutnya. Pendapat singkat dari dokter atau bidan lebih baik daripada menebak.'
+      ]
+    }
+  },
+  {
+    id: 'may-contain',
+    category: 'Labels',
+    readTime: 3,
+    image: img('photo-1610832958506-aa56368176cf'),
+    conditions: [HealthCondition.ALLERGIES, HealthCondition.AUTOIMMUNE],
+    en: {
+      title: '"May contain" warnings: what they really mean',
+      summary: 'Precautionary labels are voluntary, which makes them tricky.',
+      content: [
+        'A "may contain" or "made in a facility with" line means the product could pick up traces of an allergen during production. It is not part of the recipe.',
+        'These warnings are voluntary in many countries. A product without one is not a guarantee that it is free from cross-contact.',
+        'If your allergy is severe, treat "may contain" as "contains", and contact the brand when in doubt. Many will tell you exactly how a line is cleaned.',
+        'For gluten, look for a certified gluten-free mark rather than relying on the ingredient list alone.'
+      ]
+    },
+    idn: {
+      title: 'Peringatan "dapat mengandung": apa artinya',
+      summary: 'Label pencegahan bersifat sukarela, jadi perlu dibaca dengan hati-hati.',
+      content: [
+        'Tulisan "dapat mengandung" atau "diproduksi di fasilitas yang juga mengolah" berarti produk bisa terkena sisa alergen saat produksi. Bahan itu bukan bagian dari resep.',
+        'Di banyak negara peringatan ini sukarela. Produk tanpa peringatan belum tentu bebas kontaminasi silang.',
+        'Jika alergimu berat, anggap "dapat mengandung" sama dengan "mengandung", dan hubungi produsennya jika ragu.',
+        'Untuk gluten, cari logo bebas gluten bersertifikat, jangan hanya mengandalkan daftar komposisi.'
+      ]
+    }
+  },
+  {
+    id: 'gentle-eating-treatment',
+    category: 'Nutrition',
+    readTime: 4,
+    image: img('photo-1505253758473-96b701d36dec'),
+    conditions: [HealthCondition.CANCER_CARE],
+    en: {
+      title: 'Eating gently during treatment',
+      summary: 'Small, practical habits for days when food is hard.',
+      content: [
+        'Small meals every few hours are often easier than three large ones, especially with nausea.',
+        'When your mouth is sore, soft, cool and mild foods tend to sit better. Skip acidic, very salty or crunchy snacks for a while.',
+        'If your care team has told you your immune system is low, ask them which raw or unpasteurized foods to avoid.',
+        'Your oncology dietitian knows your treatment plan. Use scans here to prepare questions for them, not to replace their advice.'
+      ]
+    },
+    idn: {
+      title: 'Makan dengan lembut selama pengobatan',
+      summary: 'Kebiasaan kecil yang praktis untuk hari-hari ketika makan terasa sulit.',
+      content: [
+        'Makan porsi kecil setiap beberapa jam sering lebih mudah daripada tiga kali porsi besar, terutama saat mual.',
+        'Saat mulut terasa perih, makanan lembut, dingin dan tidak berbumbu tajam biasanya lebih nyaman. Hindari makanan asam, sangat asin atau renyah sementara waktu.',
+        'Jika tim medismu bilang daya tahan tubuhmu rendah, tanyakan makanan mentah atau tidak dipasteurisasi apa yang perlu dihindari.',
+        'Ahli gizi onkologi paling tahu rencana pengobatanmu. Gunakan hasil pindaian di sini untuk menyiapkan pertanyaan, bukan sebagai pengganti saran mereka.'
+      ]
+    }
+  },
+  {
+    id: 'sunscreen-basics',
+    category: 'Skin',
+    readTime: 3,
+    image: img('photo-1447452001602-7090c774637d'),
+    en: {
+      title: 'Sunscreen is the step that does the most',
+      summary: 'If you only add one product to your routine, make it this one.',
+      content: [
+        'Daily sunscreen helps prevent sunburn, dark spots and early signs of aging. It is worth wearing on cloudy days and near windows too.',
+        'Look for "broad spectrum" and SPF 30 or higher. Use about two finger lengths for the face and neck.',
+        'Mineral filters (zinc oxide, titanium dioxide) suit sensitive skin. Chemical filters are often lighter on darker skin tones. The best sunscreen is the one you will actually wear.',
+        'Reapply every two hours outdoors, and after swimming or sweating.'
+      ]
+    },
+    idn: {
+      title: 'Sunscreen adalah langkah paling berdampak',
+      summary: 'Jika hanya menambah satu produk ke rutinitasmu, pilih yang ini.',
+      content: [
+        'Sunscreen setiap hari membantu mencegah kulit terbakar, noda gelap dan tanda penuaan dini. Tetap pakai saat mendung atau di dekat jendela.',
+        'Cari tulisan "broad spectrum" dan SPF 30 atau lebih. Gunakan sekitar dua ruas jari untuk wajah dan leher.',
+        'Filter mineral (zinc oxide, titanium dioxide) cocok untuk kulit sensitif. Filter kimia sering terasa lebih ringan di kulit gelap. Sunscreen terbaik adalah yang benar-benar kamu pakai.',
+        'Pakai ulang setiap dua jam saat di luar, dan setelah berenang atau berkeringat.'
+      ]
+    }
+  },
+  {
+    id: 'hidden-sugar',
+    category: 'Nutrition',
+    readTime: 3,
+    image: img('photo-1490645935967-10de6ba17061'),
+    conditions: [HealthCondition.PREGNANCY, HealthCondition.GENERAL_HEALTH],
+    en: {
+      title: 'Where sugar hides in "healthy" snacks',
+      summary: 'Granola, yogurt and protein bars deserve a second look.',
+      content: [
+        'Flavored yogurts, granola, cereal bars and bottled smoothies often carry as much sugar as a dessert. The front of the pack rarely says so.',
+        'Compare the sugar line per 100 g between two options. It is the quickest way to spot the better pick on the shelf.',
+        'Plain yogurt with fruit, or nuts with a piece of fruit, gives you sweetness with fiber that slows it down.',
+        'If you are managing blood sugar, ask your care team for a daily target. It makes every label easier to judge.'
+      ]
+    },
+    idn: {
+      title: 'Tempat gula bersembunyi di camilan "sehat"',
+      summary: 'Granola, yogurt dan protein bar layak dicek dua kali.',
+      content: [
+        'Yogurt berperisa, granola, sereal batang dan smoothie botolan sering mengandung gula sebanyak makanan penutup. Bagian depan kemasan jarang menyebutkannya.',
+        'Bandingkan baris gula per 100 g di dua pilihan. Itu cara tercepat menemukan pilihan yang lebih baik di rak.',
+        'Yogurt tawar dengan buah, atau kacang dengan buah, memberi rasa manis plus serat yang memperlambat penyerapannya.',
+        'Jika sedang menjaga gula darah, tanyakan target harian ke tim medismu. Membaca label jadi jauh lebih mudah.'
+      ]
+    }
+  },
+  {
+    id: 'symptom-journal',
+    category: 'Wellness',
+    readTime: 3,
+    image: img('photo-1499209974431-2761e2523676'),
+    conditions: [HealthCondition.AUTOIMMUNE, HealthCondition.ALLERGIES, HealthCondition.MORE_DISEASES],
+    en: {
+      title: 'Spot your triggers with a simple symptom log',
+      summary: 'Two minutes a day can show patterns you would otherwise miss.',
+      content: [
+        'Note what you ate, what you put on your skin and how you felt, once a day. A few words is enough.',
+        'Patterns usually show up after two or three weeks. Look for symptoms that follow the same food or product more than once.',
+        'Updating your symptoms in VitalSense helps too: when you feel off, results weigh irritating ingredients more heavily.',
+        'Share the log with your doctor. Real notes make appointments faster and more useful.'
+      ]
+    },
+    idn: {
+      title: 'Kenali pemicumu dengan catatan gejala sederhana',
+      summary: 'Dua menit sehari bisa menunjukkan pola yang biasanya terlewat.',
+      content: [
+        'Catat apa yang kamu makan, apa yang kamu pakai di kulit dan bagaimana rasanya, sekali sehari. Beberapa kata sudah cukup.',
+        'Pola biasanya terlihat setelah dua atau tiga minggu. Perhatikan gejala yang muncul setelah makanan atau produk yang sama lebih dari sekali.',
+        'Memperbarui gejala di VitalSense juga membantu: saat kamu kurang sehat, hasil akan lebih ketat menilai bahan yang bisa memicu iritasi.',
+        'Bagikan catatanmu ke dokter. Catatan nyata membuat konsultasi lebih cepat dan berguna.'
+      ]
+    }
   }
-  return articles;
+];
+
+const localize = (s: Source, lang: AppLanguage): Article => {
+  const copy = (lang === AppLanguage.ID && s.idn) || s.en;
+  const { en, idn, ...rest } = s;
+  return { ...rest, ...copy };
 };
 
-// --- PUBLIC API ---
-
-export const getDailyFeed = (userProfile: UserProfile | null): Article[] => {
-  const condition = userProfile?.condition || HealthCondition.GENERAL_HEALTH;
-  let relevantCategories: string[] = ['Nutrition', 'Wellness', 'General'];
-
-  // Map condition to relevant categories
-  if (condition === HealthCondition.PREGNANCY) relevantCategories = ['Pregnancy', 'Nutrition', 'Wellness'];
-  else if (condition === HealthCondition.CANCER_CARE) relevantCategories = ['Medical', 'Nutrition', 'Wellness'];
-  else if (condition === HealthCondition.AUTOIMMUNE) relevantCategories = ['Medical', 'Nutrition', 'General'];
-  else if (condition === HealthCondition.ALLERGIES) relevantCategories = ['Medical', 'Nutrition', 'General'];
-
-  // Generate a pool of 30 articles per relevant category
-  let pool: Article[] = [];
-  relevantCategories.forEach(cat => {
-    // Generate 30 per category as requested
-    pool = [...pool, ...generateArticlesForCategory(cat, 30)]; 
-  });
-
-  // Shuffle and pick 6 for the feed view
-  const shuffled = pool.sort(() => 0.5 - Math.random());
-  return shuffled.slice(0, 6);
+export const getDailyFeed = (profile: UserProfile | null): Article[] => {
+  const lang = profile?.language || AppLanguage.EN;
+  const condition = profile?.condition;
+  const relevant = (s: Source) => (condition && s.conditions?.includes(condition) ? 0 : s.conditions ? 2 : 1);
+  return [...SOURCES].sort((a, b) => relevant(a) - relevant(b)).map((s) => localize(s, lang));
 };
+
+export const FALLBACK_IMAGE = img('photo-1499209974431-2761e2523676');

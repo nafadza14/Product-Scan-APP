@@ -1,280 +1,221 @@
-
 import React, { useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { AlertCircle, Copy, Check, Eye, EyeOff, MailCheck } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
-import Button from './Button';
-import Card from './Card';
-import { ShieldCheck, AlertCircle, Mail, Lock, User, Eye, EyeOff, X, HelpCircle, Copy, Check } from 'lucide-react';
+import { Translator } from '../i18n';
+import { NavBar, Pressable, PrimaryButton, SecondaryButton } from './ui';
 
-interface AuthProps {
-    onCancel?: () => void;
+interface Props {
+  t: Translator;
+  rtl: boolean;
+  initialMode: 'signin' | 'signup';
+  onClose: () => void;
 }
 
-const Auth: React.FC<AuthProps> = ({ onCancel }) => {
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showOAuthHelp, setShowOAuthHelp] = useState(false);
-  const [copied, setCopied] = useState(false);
+const redirectUrl = () => {
+  const origin = window.location.origin.startsWith('http') ? window.location.origin : `https://${window.location.origin}`;
+  return origin.endsWith('/') ? origin : `${origin}/`;
+};
 
-  // Form State
+const Field: React.FC<React.InputHTMLAttributes<HTMLInputElement> & { label: string; trailing?: React.ReactNode }> = ({ label, trailing, id, ...rest }) => (
+  <label htmlFor={id} className="flex items-center gap-3 px-4 h-[60px]">
+    <span className="flex-1 min-w-0">
+      <span className="block text-[12px] text-ink-muted leading-none mb-1">{label}</span>
+      <input id={id} className="w-full bg-transparent outline-none text-[16px] text-ink placeholder:text-ink-faint" {...rest} />
+    </span>
+    {trailing}
+  </label>
+);
+
+const Auth: React.FC<Props> = ({ t, rtl, initialMode, onClose }) => {
+  const [mode, setMode] = useState(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState<'email' | 'google' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [redirectError, setRedirectError] = useState(false);
+  const [confirmSent, setConfirmSent] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  // Calculate the exact redirect URL we are using
-  const getRedirectUrl = () => {
-    let origin = window.location.origin;
-    if (!origin.startsWith('http')) {
-      origin = `https://${origin}`;
-    }
-    return origin.endsWith('/') ? origin : `${origin}/`;
-  };
+  const isSignUp = mode === 'signup';
 
-  const handleAuth = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setErrorMessage(null);
-
+    setLoading('email');
+    setError(null);
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        const { data, error: err } = await supabase.auth.signUp({
           email,
           password,
-          options: {
-            data: {
-              full_name: fullName,
-            },
-            emailRedirectTo: getRedirectUrl(),
-          },
+          options: { data: { full_name: fullName.trim() }, emailRedirectTo: redirectUrl() }
         });
-        if (error) throw error;
+        if (err) throw err;
+        // With email confirmation on, Supabase returns no session until the link is opened.
+        if (!data.session) setConfirmSent(true);
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
+        const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+        if (err) throw err;
       }
-    } catch (error: any) {
-      console.error("Authentication Error:", error);
-      setErrorMessage(error.message || "Terjadi kesalahan yang tidak terduga.");
+    } catch (err: any) {
+      setError(err?.message || t('errAuthGeneric'));
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
   };
 
-  const handleGoogleAuth = async () => {
-    setLoading(true);
-    setErrorMessage(null);
+  const google = async () => {
+    setLoading('google');
+    setError(null);
+    setRedirectError(false);
+    const { error: err } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: redirectUrl(), queryParams: { access_type: 'offline', prompt: 'select_account' } }
+    });
+    if (err) {
+      setError(t('errRedirect'));
+      setRedirectError(true);
+      setLoading(null);
+    }
+  };
+
+  const copy = async () => {
     try {
-      const redirectTo = getRedirectUrl();
-      console.log("Attempting Google Auth with Redirect:", redirectTo);
-
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectTo,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'select_account',
-          },
-        }
-      });
-      if (error) throw error;
-    } catch (error: any) {
-      console.error("Google Auth Error:", error);
-      // If we see the specific path error, trigger the help immediately
-      if (error.message?.includes('invalid') || error.message?.includes('path')) {
-          setShowOAuthHelp(true);
-      }
-      setErrorMessage("Supabase menolak permintaan redirect. Cek pengaturan dashboard Anda.");
-      setLoading(false);
-    }
+      await navigator.clipboard.writeText(redirectUrl());
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch { /* clipboard blocked */ }
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(getRedirectUrl());
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  if (confirmSent) {
+    return (
+      <div className="flex-1 overflow-y-auto">
+        <NavBar onClose={onClose} backLabel={t('back')} closeLabel={t('close')} rtl={rtl} />
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="px-6 pt-10 text-center">
+          <div className="w-20 h-20 mx-auto rounded-[28px] bg-sage flex items-center justify-center text-ink mb-6">
+            <MailCheck size={34} />
+          </div>
+          <h1 className="text-[26px] font-semibold text-ink mb-2">{t('checkEmailTitle')}</h1>
+          <p className="text-[16px] text-ink-muted leading-relaxed mb-8">{t('checkEmailBody', { email })}</p>
+          <PrimaryButton onClick={onClose}>{t('done')}</PrimaryButton>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden animate-in fade-in zoom-in duration-300">
-      
-      {/* Background Orbs */}
-      <div className="absolute top-[-10%] left-[-10%] w-[300px] h-[300px] bg-[#6FAE9A]/20 rounded-full blur-[80px] animate-float"></div>
-      <div className="absolute bottom-[-10%] right-[-10%] w-[300px] h-[300px] bg-[#4D8C7A]/20 rounded-full blur-[80px] animate-float" style={{ animationDelay: '2s' }}></div>
-
-      {/* Close Button */}
-      {onCancel && (
-          <button 
-            onClick={onCancel}
-            className="absolute top-6 right-6 z-20 p-2 bg-white/40 backdrop-blur-md rounded-full text-gray-600 hover:bg-white/60 transition-colors"
-          >
-              <X size={24} />
-          </button>
-      )}
-
-      {/* Main Content */}
-      <div className="w-full max-w-sm relative z-10">
-        <div className="flex flex-col items-center mb-8">
-            <div className="relative mb-6">
-                <div className="absolute inset-0 bg-[#6FAE9A]/30 rounded-full blur-xl animate-pulse-soft"></div>
-                <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-[#6FAE9A] to-[#4D8C7A] flex items-center justify-center shadow-2xl relative z-10 text-white transform rotate-3">
-                    <ShieldCheck size={48} />
-                </div>
-            </div>
-            
-            <h1 className="text-3xl font-bold text-[#1C1C1C] mb-2 text-center tracking-tight">
-                VitalSense
-            </h1>
-            <p className="text-gray-500 text-center text-sm font-medium">
-                {isSignUp 
-                ? "Pendamping kesehatan pribadi Anda." 
-                : "Selamat datang kembali di ruang aman Anda."}
-            </p>
+    <div className="flex-1 overflow-y-auto no-scrollbar">
+      <NavBar onClose={onClose} backLabel={t('back')} closeLabel={t('close')} rtl={rtl} />
+      <div className="px-5 pb-10">
+        <div className="w-16 h-16 rounded-[22px] bg-ink flex items-center justify-center mb-6 shadow-lift" aria-hidden>
+          <svg viewBox="0 0 512 512" className="w-10 h-10">
+            <circle cx="256" cy="256" r="150" fill="none" stroke="#2B4A4D" strokeWidth="44" />
+            <path d="M256 106a150 150 0 0 1 142 102" fill="none" stroke="#EE5F3B" strokeWidth="44" strokeLinecap="round" />
+            <circle cx="256" cy="256" r="40" fill="#E9EEEC" />
+          </svg>
         </div>
 
-        <Card variant="glass" className="backdrop-blur-xl">
-            {errorMessage && (
-                <div className="mb-6 p-4 bg-red-50/90 border border-red-100 rounded-2xl">
-                    <div className="flex items-start gap-3 mb-2">
-                        <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={18} />
-                        <p className="text-xs font-semibold text-red-600 leading-snug">{errorMessage}</p>
-                    </div>
-                    
-                    <button 
-                        onClick={() => setShowOAuthHelp(!showOAuthHelp)}
-                        className="text-[10px] font-bold text-red-700 underline flex items-center gap-1 mt-1"
-                    >
-                        <HelpCircle size={10} /> Cara perbaiki Error Redirect
-                    </button>
-                    
-                    {showOAuthHelp && (
-                        <div className="mt-4 p-4 bg-white/80 rounded-xl text-[10px] text-gray-700 space-y-3 border border-red-200 shadow-sm animate-in fade-in slide-in-from-top-2">
-                            <p className="font-bold text-red-600">PENTING: Salin URL di bawah ini ke Supabase Dashboard:</p>
-                            
-                            <div className="flex items-center gap-2 p-2 bg-gray-100 rounded-lg border border-gray-200 group">
-                                <code className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[9px] text-gray-600">
-                                    {getRedirectUrl()}
-                                </code>
-                                <button 
-                                    onClick={copyToClipboard}
-                                    className="p-1.5 hover:bg-white rounded-md transition-colors text-gray-400 hover:text-[#6FAE9A]"
-                                    title="Copy to clipboard"
-                                >
-                                    {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
-                                </button>
-                            </div>
+        <AnimatePresence mode="wait">
+          <motion.div key={mode} initial={{ opacity: 0, x: rtl ? -12 : 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: rtl ? 12 : -12 }} transition={{ duration: 0.22 }}>
+            <h1 className="text-[30px] leading-tight font-semibold tracking-[-0.02em] text-ink">{isSignUp ? t('authCreate') : t('authWelcomeBack')}</h1>
+            <p className="text-[16px] text-ink-muted mt-1.5 mb-7">{isSignUp ? t('authCreateSub') : t('authWelcomeBackSub')}</p>
+          </motion.div>
+        </AnimatePresence>
 
-                            <ol className="list-decimal pl-4 space-y-1 text-gray-500">
-                                <li>Buka <strong>Supabase Dashboard</strong></li>
-                                <li>Pilih <strong>Authentication</strong> &gt; <strong>URL Configuration</strong></li>
-                                <li>Paste URL di atas ke <strong>Site URL</strong></li>
-                                <li>Klik <strong>Save</strong> dan coba lagi.</li>
-                            </ol>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            <form onSubmit={handleAuth} className="space-y-4">
-                
-                {isSignUp && (
-                <div className="relative group">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6FAE9A]" size={20} />
-                    <input 
-                    type="text" 
-                    placeholder="Nama Lengkap"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="w-full h-14 pl-12 pr-4 rounded-xl bg-white/50 border border-white/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#6FAE9A]/50 transition-all font-medium placeholder:text-gray-400"
-                    required={isSignUp}
-                    />
-                </div>
-                )}
-
-                <div className="relative group">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6FAE9A]" size={20} />
-                <input 
-                    type="email" 
-                    placeholder="Alamat Email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full h-14 pl-12 pr-4 rounded-xl bg-white/50 border border-white/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#6FAE9A]/50 transition-all font-medium placeholder:text-gray-400"
-                    required
-                />
-                </div>
-
-                <div className="relative group">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6FAE9A]" size={20} />
-                <input 
-                    type={showPassword ? "text" : "password"} 
-                    placeholder="Kata Sandi"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full h-14 pl-12 pr-12 rounded-xl bg-white/50 border border-white/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#6FAE9A]/50 transition-all font-medium placeholder:text-gray-400"
-                    required
-                    minLength={6}
-                />
-                <button 
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#6FAE9A] transition-colors"
-                >
-                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-                </div>
-
-                <div className="pt-4 space-y-4">
-                  <Button 
-                      type="submit" 
-                      fullWidth 
-                      disabled={loading}
-                      className="shadow-xl shadow-[#6FAE9A]/20"
-                  >
-                      {loading ? "Memproses..." : (isSignUp ? "Buat Akun" : "Masuk")}
-                  </Button>
-
-                  <div className="flex items-center gap-3 py-2">
-                    <div className="h-[1px] flex-1 bg-gray-200"></div>
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Atau</span>
-                    <div className="h-[1px] flex-1 bg-gray-200"></div>
-                  </div>
-
-                  <button 
-                    type="button"
-                    onClick={handleGoogleAuth}
-                    disabled={loading}
-                    className="w-full h-14 flex items-center justify-center gap-3 bg-white border border-gray-200 rounded-full font-bold text-gray-700 hover:bg-gray-50 active:scale-[0.98] transition-all shadow-sm"
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                    </svg>
-                    <span>{loading ? "Menghubungkan..." : "Masuk dengan Google"}</span>
-                  </button>
-                </div>
-            </form>
-        </Card>
-
-        <div className="mt-8 text-center">
-            <p className="text-sm text-gray-500 font-medium">
-            {isSignUp ? "Sudah punya akun?" : "Belum punya akun?"}
-            <button 
-                onClick={() => {
-                setIsSignUp(!isSignUp);
-                setErrorMessage(null);
-                }} 
-                className="text-[#6FAE9A] font-bold ml-1 hover:text-[#5D9A88] transition-colors"
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+              role="alert"
             >
-                {isSignUp ? "Masuk" : "Daftar Sekarang"}
-            </button>
-            </p>
+              <div className="rounded-2xl bg-avoid/10 p-3.5 mb-4">
+                <p className="flex gap-2 text-[14px] text-avoid font-medium">
+                  <AlertCircle size={18} className="shrink-0 mt-px" /> {error}
+                </p>
+                {redirectError && (
+                  <div className="mt-3">
+                    <p className="text-[13px] text-ink-soft mb-2">{t('redirectHelp')}</p>
+                    <div className="flex items-center gap-2 rounded-xl bg-white px-3 h-10">
+                      <code className="flex-1 truncate text-[12px] text-ink">{redirectUrl()}</code>
+                      <button onClick={copy} className="text-[13px] font-semibold text-coral flex items-center gap-1">
+                        {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? t('copied') : t('copy')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <form onSubmit={submit}>
+          <div className="rounded-3xl bg-white shadow-soft divide-y divide-canvas mb-5 overflow-hidden">
+            <AnimatePresence initial={false}>
+              {isSignUp && (
+                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                  <Field id="name" label={t('fullName')} value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" required />
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <Field id="email" label={t('email')} type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <Field
+              id="password"
+              label={t('password')}
+              type={showPw ? 'text' : 'password'}
+              autoComplete={isSignUp ? 'new-password' : 'current-password'}
+              placeholder={isSignUp ? t('passwordHint') : undefined}
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              trailing={
+                <button type="button" onClick={() => setShowPw((s) => !s)} aria-label={showPw ? t('hidePassword') : t('showPassword')} className="text-ink-muted p-1">
+                  {showPw ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              }
+            />
+          </div>
+
+          <PrimaryButton type="submit" disabled={!!loading}>
+            {loading === 'email' ? t('working') : isSignUp ? t('createAccount') : t('signIn')}
+          </PrimaryButton>
+        </form>
+
+        <div className="flex items-center gap-3 my-5">
+          <span className="h-px flex-1 bg-sage-deep/40" />
+          <span className="text-[13px] text-ink-muted">{t('or')}</span>
+          <span className="h-px flex-1 bg-sage-deep/40" />
         </div>
+
+        <SecondaryButton onClick={google} disabled={!!loading}>
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden>
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05" />
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+          </svg>
+          {loading === 'google' ? t('working') : t('google')}
+        </SecondaryButton>
+
+        <p className="text-center text-[15px] text-ink-muted mt-7">
+          {isSignUp ? t('haveAccount') : t('newHere')}{' '}
+          <Pressable
+            haptics={false}
+            onClick={() => {
+              setMode(isSignUp ? 'signin' : 'signup');
+              setError(null);
+              setRedirectError(false);
+            }}
+            className="font-semibold text-coral inline"
+          >
+            {isSignUp ? t('signIn') : t('createAccount')}
+          </Pressable>
+        </p>
       </div>
     </div>
   );

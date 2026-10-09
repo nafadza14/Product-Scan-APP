@@ -1,21 +1,26 @@
-
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
-  // Load env file based on mode (development/production)
-  // Casting process to any to fix the TypeScript error where 'cwd' is not found on the Process type.
   const env = loadEnv(mode, (process as any).cwd(), '');
-  
+  const pick = (...keys: string[]) => {
+    for (const k of keys) {
+      const v = process.env[k] || env[k];
+      if (v) return v;
+    }
+    return '';
+  };
+
   return {
     plugins: [react()],
     define: {
-      // Priority: Vercel/System Env -> Local .env -> Empty String
-      // This ensures AI analysis works on live deployments
-      'process.env.API_KEY': JSON.stringify(process.env.API_KEY || env.API_KEY || env.VITE_API_KEY || "")
+      // Accept the name the README documents (GEMINI_API_KEY) as well as the older ones.
+      'process.env.API_KEY': JSON.stringify(pick('GEMINI_API_KEY', 'API_KEY', 'VITE_API_KEY')),
+      'process.env.GEMINI_MODEL': JSON.stringify(pick('GEMINI_MODEL') || 'gemini-flash-latest'),
     },
     build: {
       outDir: 'dist',
-    }
+      chunkSizeWarningLimit: 900,
+    },
   };
 });

@@ -1,0 +1,13 @@
+{
+  "short_name": "VitalSense",
+  "name": "VitalSense: label and skin scanner",
+  "icons": [
+    { "src": "/icon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
+    { "src": "/icon-192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512" }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#E9EEEC",
+  "background_color": "#E9EEEC"
+}

@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: light;
+}
+
+html, body {
+  margin: 0;
+  background: #CFD9D6;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+body {
+  font-family: 'Onest', 'IBM Plex Sans Arabic', 'PingFang SC', 'Noto Sans SC', system-ui, sans-serif;
+  color: #0E2B2E;
+  font-feature-settings: 'ss01', 'cv11';
+}
+
+#root {
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+}
+
+button { -webkit-user-select: none; user-select: none; }
+
+:focus-visible {
+  outline: 2px solid #EE5F3B;
+  outline-offset: 2px;
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.pt-safe { padding-top: max(var(--safe-top), 14px); }
+.pb-safe { padding-bottom: max(var(--safe-bottom), 14px); }
+
+.blur-bar {
+  background: rgba(233, 238, 236, 0.78);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
+
+.blur-dark {
+  background: rgba(14, 43, 46, 0.55);
+  backdrop-filter: saturate(160%) blur(18px);
+  -webkit-backdrop-filter: saturate(160%) blur(18px);
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #DCE6E4 25%, #EEF3F2 50%, #DCE6E4 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

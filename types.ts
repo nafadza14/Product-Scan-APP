@@ -1,15 +1,3 @@
-
-export enum ViewState {
-  AUTH = 'AUTH',
-  ONBOARDING = 'ONBOARDING',
-  HOME = 'HOME',
-  SCANNER = 'SCANNER',
-  RESULT = 'RESULT',
-  PANTRY = 'PANTRY',
-  PROFILE = 'PROFILE',
-  RANKING = 'RANKING'
-}
-
 export enum AppLanguage {
   EN = 'en',
   ID = 'id',
@@ -32,9 +20,9 @@ export interface UserProfile {
   name: string;
   condition: HealthCondition;
   language: AppLanguage;
-  customConditionName?: string; 
-  additionalContext: string[]; 
-  currentSymptoms: string[];   
+  customConditionName?: string;
+  additionalContext: string[];
+  currentSymptoms: string[];
 }
 
 export enum ScanStatus {
@@ -51,7 +39,7 @@ export interface IngredientAnalysis {
 
 export interface MacroNutrient {
   name: 'Fat' | 'Saturated Fat' | 'Sugar' | 'Salt' | 'Protein';
-  value: string; 
+  value: string;
   level: 'Low' | 'Medium' | 'High';
 }
 
@@ -64,16 +52,16 @@ export interface DietarySuitability {
 
 export interface ScanResult {
   productName: string;
-  category: 'Food' | 'Cosmetic' | 'Other'; 
-  icon?: string; 
+  category: 'Food' | 'Cosmetic' | 'Other';
+  icon?: string;
   status: ScanStatus;
-  score: number; 
-  nutriScore?: 'A' | 'B' | 'C' | 'D' | 'E'; 
+  score: number;
+  nutriScore?: 'A' | 'B' | 'C' | 'D' | 'E';
   explanation: string;
-  ingredients: IngredientAnalysis[]; 
-  fullIngredientList: string; 
-  nutritionAdvisor?: MacroNutrient[]; 
-  dietarySuitability?: DietarySuitability; 
+  ingredients: IngredientAnalysis[];
+  fullIngredientList: string;
+  nutritionAdvisor?: MacroNutrient[];
+  dietarySuitability?: DietarySuitability;
   alternatives: Array<{ name: string; reason: string }>;
 }
 
@@ -83,20 +71,55 @@ export interface ScanHistoryItem extends ScanResult {
   isFavorite?: boolean;
 }
 
-export interface DashboardStat {
-  label: string;
-  value: string;
-  trend?: 'up' | 'down' | 'neutral';
+export type SkinType = 'Dry' | 'Normal' | 'Combination' | 'Oily';
+
+export interface SkinMetrics {
+  moisture: number;
+  firmness: number;
+  texture: number;
+  poreVisibility: number;
+  evenness: number;
+}
+
+export interface SkinRoutineStep {
+  step: string;
+  tip: string;
+}
+
+export interface SkinAnalysis {
+  skinType: SkinType;
+  metrics: SkinMetrics;
+  concerns: string[];
+  summary: string;
+  routine: SkinRoutineStep[];
+  lookFor: string[];
+  avoid: string[];
+}
+
+export interface SkinScanItem extends SkinAnalysis {
+  id: string;
+  timestamp: number;
 }
 
 export interface Article {
   id: string;
   title: string;
-  category: string;
-  source: string;
-  sourceUrl: string;
-  date: string;
-  readTime: string;
-  content: string[]; 
+  category: 'Nutrition' | 'Skin' | 'Labels' | 'Wellness';
+  readTime: number;
   summary: string;
+  content: string[];
+  image: string;
+  conditions?: HealthCondition[];
+}
+
+export type ScanMode = 'product' | 'skin';
+
+export type AnalysisErrorCode = 'missing_key' | 'not_recognized' | 'no_face' | 'network' | 'unknown';
+
+export class AnalysisError extends Error {
+  code: AnalysisErrorCode;
+  constructor(code: AnalysisErrorCode, message?: string) {
+    super(message || code);
+    this.code = code;
+  }
 }
