@@ -6,7 +6,7 @@ const env = Object.fromEntries(
   readFileSync('.env.local', 'utf8').split(/\r?\n/).filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')).trim(), l.slice(l.indexOf('=') + 1).trim()])
 );
 const key = process.env.SUMOPOD_API_KEY || env.SUMOPOD_API_KEY;
-const model = process.env.SUMOPOD_MODEL || env.SUMOPOD_MODEL || 'MiniMax-M3.1-Flash-Preview';
+const model = process.env.SUMOPOD_MODEL || env.SUMOPOD_MODEL || 'gemini/gemini-3.1-flash-lite';
 if (!key) { console.error('SUMOPOD_API_KEY not found in .env.local'); process.exit(1); }
 
 const image = readFileSync('qa/assets/label.png').toString('base64');

@@ -97,7 +97,7 @@ SKIN = {
 
 def ai_route(route: Route):
     if route.request.method == "GET":
-        return route.fulfill(status=200, content_type="application/json", body=json.dumps({"configured": True, "model": "MiniMax-M3.1-Flash-Preview"}))
+        return route.fulfill(status=200, content_type="application/json", body=json.dumps({"configured": True, "model": "gemini/gemini-3.1-flash-lite"}))
     body = route.request.post_data or ""
     state["requests"].append(("gemini", body[:200]))
     if state["gemini"] == "network":

@@ -2,7 +2,7 @@
 // The Sumopod key never reaches the browser: the client posts messages here and we add the key.
 
 const BASE_URL = process.env.SUMOPOD_BASE_URL || 'https://ai.sumopod.com/v1';
-const DEFAULT_MODEL = 'MiniMax-M3.1-Flash-Preview';
+const DEFAULT_MODEL = 'gemini/gemini-3.1-flash-lite';
 
 // Accept a few common spellings, and ignore stray spaces or quotes pasted into the dashboard.
 const KEY_NAMES = ['SUMOPOD_API_KEY', 'VITE_SUMOPOD_API_KEY', 'SUMOPOD_KEY', 'SUMOPOD_APIKEY'];

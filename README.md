@@ -2,7 +2,7 @@
 
 Scan a food or skincare label and see whether it suits your health profile. Check your skin with a selfie and get a simple routine.
 
-Built with React, Vite, Tailwind, Framer Motion, Supabase (auth and data) and Sumopod (image analysis with `MiniMax-M3.1-Flash-Preview`).
+Built with React, Vite, Tailwind, Framer Motion, Supabase (auth and data) and Sumopod (image analysis with `gemini/gemini-3.1-flash-lite`).
 
 ## Run locally
 
@@ -14,7 +14,7 @@ echo "SUMOPOD_API_KEY=your-key" > .env.local
 npm run dev
 ```
 
-Optional: `SUMOPOD_MODEL` overrides the model (default `MiniMax-M3.1-Flash-Preview`), `SUMOPOD_BASE_URL` overrides the API base (default `https://ai.sumopod.com/v1`).
+Optional: `SUMOPOD_MODEL` overrides the model (default `gemini/gemini-3.1-flash-lite`), `SUMOPOD_BASE_URL` overrides the API base (default `https://ai.sumopod.com/v1`).
 
 The browser never sees the key. It posts to `/api/chat`; `api/chat.js` (Vercel) and the Vite dev server both forward that to Sumopod with the key added on the server.
 
