@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AppLanguage, Article, DiaryLog, DiaryPrefs, ScanHistoryItem, ScanMode, SkinScanItem, UserProfile, UserRoutine } from './types';
+import { AppLanguage, Article, DiaryLog, FeedItem, DiaryPrefs, ScanHistoryItem, ScanMode, SkinScanItem, UserProfile, UserRoutine } from './types';
 import { makeT } from './i18n';
-import { supabase } from './services/supabaseClient';
+import { supabase, requestPersistentStorage } from './services/supabaseClient';
+import { CloudStatus, getCloudStatus, mergeLogs, mergeScans, onCloudStatus, pullAll, pushLog, pushSettings, pushSkinCheck } from './services/cloudSync';
 import {
   addScanResult,
   cacheHistory,
@@ -24,6 +25,7 @@ import {
   getLogs,
   getPrefs,
   getRoutine,
+  loadPhoto,
   makeThumb,
   recentLogText,
   routineFromScan,
@@ -37,7 +39,7 @@ import DiaryView from './components/diary/DiaryView';
 import { CompareView, GoalsSheet, RoutineEditor } from './components/diary/DiarySheets';
 import { NavBar } from './components/ui';
 import HomeView from './components/HomeView';
-import { ExploreView, ArticlePage } from './components/ExploreView';
+import { ExploreView, ArticlePage, FeedArticlePage } from './components/ExploreView';
 import LibraryView from './components/LibraryView';
 import ProfileView from './components/ProfileView';
 import TabBar, { Tab } from './components/TabBar';
@@ -54,6 +56,7 @@ type Overlay =
   | { k: 'product'; id: string }
   | { k: 'skin'; id: string }
   | { k: 'article'; article: Article }
+  | { k: 'feedItem'; item: FeedItem }
   | { k: 'language' }
   | { k: 'auth'; mode: 'signin' | 'signup' }
   | { k: 'onboarding'; mode: OnboardingMode }
@@ -63,7 +66,7 @@ type Overlay =
   | { k: 'products' };
 
 const presentation = (o: Overlay): 'push' | 'sheet' | 'full' =>
-  o.k === 'article' ? 'push' : o.k === 'scanner' || (o.k === 'onboarding' && o.mode === 'new') ? 'full' : 'sheet';
+  o.k === 'article' || o.k === 'feedItem' ? 'push' : o.k === 'scanner' || (o.k === 'onboarding' && o.mode === 'new') ? 'full' : 'sheet';
 
 const LANG_KEY = 'vitalSense_lang';
 
@@ -94,6 +97,8 @@ const App: React.FC = () => {
   const [routineSource, setRoutineSource] = useState<string | null>(null);
   const [deviceLang, setDeviceLang] = useState<AppLanguage>(detectLanguage);
   const [hasApiKey, setHasApiKey] = useState(true);
+  const [cloudStatus, setCloudStatus] = useState<CloudStatus>(getCloudStatus());
+  useEffect(() => onCloudStatus(setCloudStatus) as unknown as () => void, []);
   const [tab, setTab] = useState<Tab>('home');
   const [overlays, setOverlays] = useState<Overlay[]>([]);
 
@@ -163,57 +168,116 @@ const App: React.FC = () => {
       setUserId(id);
       setEmail(mail);
       setMetaName(nameFromMeta || '');
+      // 1. Show what this device already has, instantly.
       const cached = getCachedProfile(id);
       if (cached) setUser(cached);
       setHistory(getCachedHistory(id));
-      setSkinHistory(getSkinHistory(id));
-      setLogs(getLogs(id));
-      setRoutine(getRoutine(id));
-      setPrefs(getPrefs(id));
+      const localScans = getSkinHistory(id);
+      const localLogs = getLogs(id);
+      const localRoutine = getRoutine(id);
+      const localPrefs = getPrefs(id);
+      setSkinHistory(localScans);
+      setLogs(localLogs);
+      setRoutine(localRoutine);
+      setPrefs(localPrefs);
 
+      // 2. Profile from the account.
       const profile = await getUserProfile(id);
       if (userIdRef.current !== id) return;
       if (profile) {
         const merged = { ...profile, name: profile.name || nameFromMeta || '' };
         setUser(merged);
         cacheProfile(id, merged);
+        if (profile.language) {
+          setDeviceLang(profile.language);
+        }
       } else if (!cached) {
         setUser(null);
         open({ k: 'onboarding', mode: 'new' });
+      } else {
+        // The account has no profile row yet (for example an earlier save failed): save the cached one.
+        updateUserProfile(id, cached);
       }
-      const remote = await getScanHistory(id);
-      if (userIdRef.current === id) setHistory(remote);
+
+      // 3. Product scans and favorites.
+      const remoteHistory = await getScanHistory(id);
+      if (userIdRef.current !== id) return;
+
+      // 4. Diary from the cloud, merged with anything only this device has.
+      const cloud = await pullAll(id);
+      if (userIdRef.current !== id) return;
+      if (cloud) {
+        const scans = mergeScans(localScans, cloud.scans);
+        const logsMerged = mergeLogs(localLogs, cloud.logs);
+        const remoteSettingsNewer = cloud.settings && cloud.settings.updatedAt >= (localRoutine?.updatedAt || 0);
+        const routineFinal = remoteSettingsNewer ? cloud.settings!.routine : localRoutine;
+        const goalsFinal = remoteSettingsNewer && cloud.settings!.goals ? cloud.settings!.goals : localPrefs.goals;
+        const favs = new Set([...(cloud.settings?.favorites || []), ...getFavoriteIds(id)]);
+
+        setSkinHistory(scans);
+        saveSkinHistory(id, scans);
+        setLogs(logsMerged);
+        saveLogs(id, logsMerged);
+        setRoutine(routineFinal);
+        if (routineFinal) saveRoutine(id, routineFinal);
+        setPrefs({ goals: goalsFinal });
+        savePrefs(id, { goals: goalsFinal });
+        setFavoriteIds(id, favs);
+        setHistory(remoteHistory.map((h) => ({ ...h, isFavorite: favs.has(h.id) })));
+
+        // Upload what only this device had (first run after setup, or offline edits).
+        const remoteIds = new Set(cloud.scans.map((x) => x.id));
+        for (const sc of localScans.filter((x) => !remoteIds.has(x.id))) {
+          loadPhoto(sc.photoId).then((ph) => pushSkinCheck(id, sc, ph || undefined));
+        }
+        for (const [d, l] of Object.entries(localLogs)) {
+          const r = cloud.logs[d];
+          if (!r || (l.updatedAt || 0) > (r.updatedAt || 0)) pushLog(id, l);
+        }
+        if (!cloud.settings || !remoteSettingsNewer) pushSettings(id, { routine: routineFinal, goals: goalsFinal, favorites: Array.from(favs) });
+      } else {
+        setHistory(remoteHistory);
+      }
     },
     [open]
   );
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
-      checkAiConfigured().then(setHasApiKey);
-      try {
-        const { data } = await supabase.auth.getSession();
-        const s = data.session;
-        if (s?.user && mounted) {
-          userIdRef.current = s.user.id;
-          await Promise.race([
-            loadUser(s.user.id, s.user.email, s.user.user_metadata?.full_name || s.user.user_metadata?.name),
-            new Promise((r) => setTimeout(r, 2500))
-          ]);
-        }
-      } finally {
-        if (mounted) setBooting(false);
+    let booted = false;
+    checkAiConfigured().then(setHasApiKey);
+    requestPersistentStorage();
+    const finishBoot = () => {
+      if (!booted && mounted) {
+        booted = true;
+        setBooting(false);
       }
-    })();
+    };
+    // Safety net: never sit on the splash screen for long.
+    const bootTimer = window.setTimeout(finishBoot, 4000);
+
+    const nameOf = (u: any) => u?.user_metadata?.full_name || u?.user_metadata?.name;
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
-      if (event === 'SIGNED_IN' && session?.user && session.user.id !== userIdRef.current) {
+      // INITIAL_SESSION fires once with the stored session (or null) after supabase-js has read
+      // and, if needed, refreshed it. Using it avoids treating a still-loading session as signed out.
+      if (event === 'INITIAL_SESSION') {
+        if (session?.user) {
+          userIdRef.current = session.user.id;
+          setTimeout(() => {
+            Promise.race([loadUser(session.user.id, session.user.email, nameOf(session.user)), new Promise((r) => setTimeout(r, 2500))]).finally(finishBoot);
+          }, 0);
+        } else {
+          finishBoot();
+        }
+      } else if (event === 'SIGNED_IN' && session?.user && session.user.id !== userIdRef.current) {
         userIdRef.current = session.user.id;
         // Close the sign-in sheet first, then load (which may open onboarding).
         closeAll();
-        setTimeout(() => loadUser(session.user.id, session.user.email, session.user.user_metadata?.full_name || session.user.user_metadata?.name), 50);
+        setTimeout(() => loadUser(session.user.id, session.user.email, nameOf(session.user)), 50);
         setTab('home');
+        finishBoot();
       } else if (event === 'SIGNED_OUT') {
         userIdRef.current = null;
         setUserId(null);
@@ -224,10 +288,12 @@ const App: React.FC = () => {
         setLogs({});
         setRoutine(null);
         setPrefs({ goals: [] });
+        finishBoot();
       }
     });
     return () => {
       mounted = false;
+      window.clearTimeout(bootTimer);
       sub.subscription.unsubscribe();
     };
   }, [loadUser, closeAll]);
@@ -243,7 +309,7 @@ const App: React.FC = () => {
     if (user && userId) {
       const p = { ...user, language: l };
       setUser(p);
-      cacheProfile(userId, p);
+      updateUserProfile(userId, p);
     }
     setTimeout(close, 180);
   };
@@ -252,8 +318,10 @@ const App: React.FC = () => {
     if (!userId) return;
     setHistory((prev) => {
       const next = prev.map((h) => (h.id === id ? { ...h, isFavorite: !h.isFavorite } : h));
-      setFavoriteIds(userId, new Set(next.filter((h) => h.isFavorite).map((h) => h.id)));
+      const favs = next.filter((h) => h.isFavorite).map((h) => h.id);
+      setFavoriteIds(userId, new Set(favs));
       cacheHistory(userId, next);
+      pushSettings(userId, { routine, goals: prefs.goals, favorites: favs });
       return next;
     });
   };
@@ -298,7 +366,8 @@ const App: React.FC = () => {
         // Keep a small thumbnail on this device so the diary can show progress photos.
         const thumb = await makeThumb(`data:image/jpeg;base64,${base64}`);
         await savePhoto(id, thumb);
-        const item: SkinScanItem = { ...result, id, timestamp: Date.now(), photoId: id };
+        const item: SkinScanItem = { ...result, id, timestamp: Date.now(), photoId: id, photoPath: `${userId}/${id}.jpg` };
+        pushSkinCheck(userId, item, thumb);
         setSkinHistory((prev) => {
           const next = [item, ...prev];
           saveSkinHistory(userId, next);
@@ -315,8 +384,10 @@ const App: React.FC = () => {
   const updateLog = (date: string, patch: Partial<DiaryLog>) => {
     if (!userId) return;
     setLogs((prev) => {
-      const next = { ...prev, [date]: { ...(prev[date] || emptyLog(date)), ...patch } };
+      const entry = { ...(prev[date] || emptyLog(date)), ...patch, updatedAt: Date.now() };
+      const next = { ...prev, [date]: entry };
       saveLogs(userId, next);
+      pushLog(userId, entry);
       return next;
     });
   };
@@ -325,6 +396,7 @@ const App: React.FC = () => {
     if (!userId) return;
     setRoutine(r);
     saveRoutine(userId, r);
+    pushSettings(userId, { routine: r, goals: prefs.goals, favorites: history.filter((h) => h.isFavorite).map((h) => h.id) });
   };
 
   const applyScanRoutine = (scan?: SkinScanItem) => {
@@ -421,7 +493,10 @@ const App: React.FC = () => {
               onSave={(goals) => {
                 const p = { ...prefs, goals };
                 setPrefs(p);
-                if (userId) savePrefs(userId, p);
+                if (userId) {
+                  savePrefs(userId, p);
+                  pushSettings(userId, { routine, goals, favorites: history.filter((h) => h.isFavorite).map((h) => h.id) });
+                }
                 close();
               }}
             />
@@ -458,6 +533,12 @@ const App: React.FC = () => {
               </div>
             </div>
           </Sheet>
+        );
+      case 'feedItem':
+        return (
+          <PushPage key={key} onBack={close} rtl={rtl} label={o.item.title}>
+            <FeedArticlePage t={t} rtl={rtl} lang={lang} item={o.item} onBack={close} />
+          </PushPage>
         );
       case 'article':
         return (
@@ -577,7 +658,7 @@ const App: React.FC = () => {
                 onProfile={() => setTab('profile')}
               />
             )}
-            {tab === 'explore' && <ExploreView t={t} user={user} onOpen={(a) => open({ k: 'article', article: a })} />}
+            {tab === 'explore' && <ExploreView t={t} user={user} goals={prefs.goals} onOpen={(a) => open({ k: 'article', article: a })} onOpenFeed={(f) => open({ k: 'feedItem', item: f })} />}
             {tab === 'diary' && (
               <DiaryView
                 t={t}
@@ -609,6 +690,7 @@ const App: React.FC = () => {
                 email={email}
                 stats={stats}
                 hasApiKey={hasApiKey}
+                cloudStatus={cloudStatus}
                 onSignIn={(mode) => open({ k: 'auth', mode })}
                 onEditProfile={() => open({ k: 'onboarding', mode: 'edit' })}
                 onUpdateSymptoms={() => open({ k: 'onboarding', mode: 'symptoms' })}

@@ -141,7 +141,7 @@ const DiaryView: React.FC<Props> = (p) => {
         </div>
         {todayScan ? (
           <Pressable onClick={() => p.onOpenSkin(todayScan)} className="w-full flex items-center gap-3.5 text-start">
-            <Thumb photoId={todayScan.photoId} className="w-[68px] h-[68px] rounded-2xl" label={t('noPhoto')} />
+            <Thumb photoId={todayScan.photoId} photoPath={todayScan.photoPath} className="w-[68px] h-[68px] rounded-2xl" label={t('noPhoto')} />
             <span className="flex-1 min-w-0">
               <span className="block text-[13px] text-ink-muted">{t('todayChecked', { time: fmtTime(todayScan.timestamp) })}</span>
               <span className="block text-[15px] font-semibold text-ink truncate mt-0.5">{todayScan.concerns.slice(0, 3).join(', ')}</span>
@@ -401,7 +401,7 @@ const DiaryView: React.FC<Props> = (p) => {
                         aria-pressed={compareMode ? sel : undefined}
                         className={`w-full flex items-center gap-3 rounded-2xl p-1.5 text-start transition-colors ${sel ? 'bg-coral/10 ring-2 ring-coral' : ''}`}
                       >
-                        <Thumb photoId={s.photoId} className="w-14 h-14 rounded-xl" label={t('noPhoto')} />
+                        <Thumb photoId={s.photoId} photoPath={s.photoPath} className="w-14 h-14 rounded-xl" label={t('noPhoto')} />
                         <span className="flex-1 min-w-0">
                           <span className="block text-[13px] text-ink-muted">{fmtTime(s.timestamp)}</span>
                           <span className="block text-[14.5px] font-semibold text-ink truncate">{s.concerns.slice(0, 3).join(', ') || t('skinCheck')}</span>

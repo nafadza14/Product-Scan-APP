@@ -1,9 +1,23 @@
 import { defineConfig, loadEnv, Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// Serves /api/chat during `npm run dev` / `npm run preview` with the same handler Vercel uses.
+// Serves /api/chat and /api/feed during `npm run dev` / `npm run preview` with the same handler Vercel uses.
 const sumopodApi = (): Plugin => {
   const middleware = async (req: any, res: any, next: any) => {
+    if (req.url?.startsWith('/api/feed')) {
+      const { handleFeed } = await import('./server/feed.js');
+      const query = Object.fromEntries(new URL(req.url, 'http://local').searchParams);
+      try {
+        const { status, body } = await handleFeed(req.method, query);
+        res.statusCode = status;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(body);
+      } catch (err: any) {
+        res.statusCode = 502;
+        res.end(JSON.stringify({ error: 'feed_error', message: String(err?.message || err) }));
+      }
+      return;
+    }
     if (!req.url?.startsWith('/api/chat')) return next();
     const { handleChat } = await import('./server/sumopod.js');
     let raw = '';

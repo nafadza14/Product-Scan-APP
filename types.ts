@@ -147,6 +147,8 @@ export interface SkinScanItem extends SkinAnalysis {
   timestamp: number;
   /** Key of the photo thumbnail in IndexedDB on this device. */
   photoId?: string;
+  /** Path of the photo in private Supabase storage, when cloud backup is set up. */
+  photoPath?: string;
 }
 
 /** One day in the skin diary. Keyed by local date YYYY-MM-DD. */
@@ -159,6 +161,7 @@ export interface DiaryLog {
   tags: string[];
   note?: string;
   done: { am: string[]; pm: string[] }; // routine step ids ticked off
+  updatedAt?: number;
 }
 
 export interface RoutineItem {
@@ -188,6 +191,20 @@ export interface Article {
   content: string[];
   image: string;
   conditions?: HealthCondition[];
+}
+
+export interface FeedItem {
+  id: string;
+  title: string;
+  summary: string;
+  link: string;
+  date: number;
+  image: string;
+  source: string;
+  category: string; // Skin, Nutrition, Pregnancy, Allergies, Immunity, Cancer care, Wellness, Labels
+  lang: string;
+  reason: string | null; // the profile choice that matched best
+  score: number;
 }
 
 export type ScanMode = 'product' | 'skin';

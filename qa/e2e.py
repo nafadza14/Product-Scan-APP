@@ -46,6 +46,11 @@ state = {
     "gemini": "ok",  # ok | not_recognized | network
     "requests": [],
     "hold": False,
+    "feed_queries": [],
+    "cloud_skin": {},
+    "cloud_logs": {},
+    "cloud_settings": None,
+    "cloud_photos": {},
     "last_ai_body": "",
     "held": [],
 }
@@ -189,6 +194,46 @@ def supabase_route(route: Route):
         row["created_at"] = "2026-10-09T00:00:00Z"
         state["scans"].insert(0, row)
         return route.fulfill(status=201, body="")
+    # ---- cloud diary tables ----
+    def rows_from(body):
+        data = json.loads(body or "{}")
+        return data if isinstance(data, list) else [data]
+    if "/rest/v1/skin_checks" in url:
+        if req.method == "GET":
+            out = sorted(state["cloud_skin"].values(), key=lambda r: -r["taken_at"])
+            return route.fulfill(status=200, content_type="application/json", body=json.dumps(out))
+        for r in rows_from(req.post_data):
+            state["cloud_skin"][r["id"]] = r
+        return route.fulfill(status=201, body="")
+    if "/rest/v1/diary_logs" in url:
+        if req.method == "GET":
+            return route.fulfill(status=200, content_type="application/json", body=json.dumps(list(state["cloud_logs"].values())))
+        for r in rows_from(req.post_data):
+            state["cloud_logs"][r["day"]] = r
+        return route.fulfill(status=201, body="")
+    if "/rest/v1/user_settings" in url:
+        if req.method == "GET":
+            row = state["cloud_settings"]
+            accept = req.headers.get("accept", "")
+            if "vnd.pgrst.object" in accept:
+                if row is None:
+                    return route.fulfill(status=406, content_type="application/json", body=json.dumps({"code": "PGRST116", "message": "JSON object requested, multiple (or no) rows returned", "details": "The result contains 0 rows"}))
+                return route.fulfill(status=200, content_type="application/vnd.pgrst.object+json", body=json.dumps(row))
+            return route.fulfill(status=200, content_type="application/json", body=json.dumps([row] if row else []))
+        state["cloud_settings"] = rows_from(req.post_data)[0]
+        return route.fulfill(status=201, body="")
+    if "/storage/v1/object/skin-photos/" in url:
+        path = url.split("/storage/v1/object/skin-photos/")[1].split("?")[0]
+        if req.method in ("POST", "PUT"):
+            raw = req.post_data_buffer or b""
+            # supabase-js sends Blobs as multipart form data; keep just the JPEG bytes.
+            start, end = raw.find(b"\xff\xd8"), raw.rfind(b"\xff\xd9")
+            state["cloud_photos"][path] = raw[start:end + 2] if start >= 0 and end > start else raw
+            return route.fulfill(status=200, content_type="application/json", body=json.dumps({"Key": f"skin-photos/{path}"}))
+        data = state["cloud_photos"].get(path)
+        if data is None:
+            return route.fulfill(status=404, content_type="application/json", body=json.dumps({"error": "not_found"}))
+        return route.fulfill(status=200, content_type="image/jpeg", body=data)
     route.fulfill(status=404, body="")
 
 
@@ -241,6 +286,11 @@ def main():
         )
         ctx.route(re.compile(r".*supabase\.co/.*"), supabase_route)
         ctx.route(re.compile(r".*/api/chat$"), ai_route)
+        FEED = (ROOT / "fixtures/feed-pregnancy.json").read_text()
+        def feed_route(route):
+            state["feed_queries"].append(route.request.url.split("?", 1)[-1])
+            route.fulfill(status=200, content_type="application/json", body=FEED)
+        ctx.route(re.compile(r".*/api/feed\?.*"), feed_route)
         ctx.route(re.compile(r".*images\.unsplash\.com/.*"), lambda r: r.fulfill(status=200, content_type="image/jpeg", body=PLACEHOLDER))
 
         page = ctx.new_page()
@@ -553,16 +603,33 @@ def main():
         def explore():
             page.get_by_role("button", name="Explore").click()
             expect(page.get_by_text("Short reads picked for Pregnancy")).to_be_visible()
-            shot(page, "23-explore")
+            expect(page.get_by_text(re.compile(r"312 articles from \d+ sources"))).to_be_visible(timeout=5000)
+            q = state["feed_queries"][-1]
+            assert "condition=Pregnancy" in q and "Gestational+Diabetes" in q and "goals=clearBreakouts" in q, q
+            expect(page.get_by_text(re.compile("Because of Gestational Diabetes")).first).to_be_visible()
+            shot(page, "27-explore-feed")
+            page.get_by_role("button", name="Pregnancy", exact=True).click()
+            page.wait_for_timeout(300)
+            scroll_main_bottom(page)
+            page.wait_for_timeout(600)
+            assert page.locator("main ul li").count() > 20, "infinite list loads more"
+            page.evaluate("document.querySelectorAll('main').forEach(m => m.scrollTo(0, 0))")
+            page.get_by_role("button", name="For you").click()
+            page.locator("main ul li").first.click()
+            page.wait_for_timeout(700)
+            link = page.get_by_role("link", name=re.compile("Read the full article on"))
+            expect(link).to_be_visible()
+            assert link.get_attribute("href").startswith("https://") and link.get_attribute("target") == "_blank"
+            shot(page, "28-feed-article")
+            page.get_by_role("button", name="Back").click()
+            page.wait_for_timeout(700)
             page.get_by_text("Skincare ingredients to pause during pregnancy").first.click()
             page.wait_for_timeout(700)
             shot(page, "24-article")
-            page.get_by_role("dialog").locator(".overflow-y-auto").first.evaluate("el => el.scrollTo(0, 500)")
-            shot(page, "25-article-scrolled")
             page.get_by_role("button", name="Back").click()
             page.wait_for_timeout(700)
             expect(page.get_by_role("dialog")).to_have_count(0)
-        check("Explore puts pregnancy reads first, article push and back", explore)
+        check("Explore: live feed personalized to profile, filters, more, source link, guides", explore)
 
         # ---------- Profile ----------
         def profile():
@@ -623,6 +690,37 @@ def main():
             page.go_back()
             page.wait_for_timeout(600)
         check("Reload keeps session, history and favorites", persistence_after_reload)
+
+        def cloud_restores_after_storage_wipe():
+            assert len(state["cloud_skin"]) >= 1 and len(state["cloud_logs"]) >= 1 and state["cloud_settings"], (len(state["cloud_skin"]), len(state["cloud_logs"]), state["cloud_settings"])
+            assert any(p.endswith(".jpg") for p in state["cloud_photos"]), "skin photo uploaded to private storage"
+            # Wipe everything this device stored for the app except the sign-in session, plus photos.
+            page.evaluate("""async () => {
+              for (const k of Object.keys(localStorage)) if (k.startsWith('vitalSense_')) localStorage.removeItem(k);
+              await new Promise(r => { const q = indexedDB.deleteDatabase('vitalSense_photos'); q.onsuccess = q.onerror = q.onblocked = () => r(); });
+            }""")
+            page.reload()
+            page.wait_for_load_state("networkidle")
+            expect(page.get_by_role("heading", name=re.compile("Hi Sarah"))).to_be_visible(timeout=6000)
+            page.get_by_role("button", name="Diary").click()
+            expect(page.get_by_text("Clear breakouts, Hydration")).to_be_visible(timeout=5000)
+            page.get_by_role("tab", name="History").click()
+            expect(page.get_by_text("Tried the new gel moisturizer.")).to_be_visible()
+            page.get_by_role("tab", name="Today").click()
+            page.get_by_role("tab", name=re.compile("Morning")).click()
+            expect(page.get_by_text("2 of 4 done")).to_be_visible()
+            img = page.locator("main img").first
+            expect(img).to_be_visible()
+            assert page.evaluate("[...document.querySelectorAll('main img')].some(i => i.src.startsWith('data:image/jpeg') && i.naturalWidth > 0)"), "photo restored from cloud storage"
+            shot(page, "29-restored-from-cloud")
+        check("Diary, routine, goals and photos restore from the account after device data is wiped", cloud_restores_after_storage_wipe)
+
+        def backup_status_shown():
+            page.get_by_role("button", name="Profile").last.click()
+            page.wait_for_timeout(300)
+            scroll_main_bottom(page)
+            expect(page.get_by_text("Synced to your account")).to_be_visible()
+        check("Profile shows backup is synced", backup_status_shown)
 
         def sign_out():
             page.get_by_role("button", name="Profile").last.click()

@@ -31,18 +31,23 @@ Add `SUMOPOD_API_KEY` under Project Settings, Environment Variables, then redepl
 | Product result | Personal score, Nutri-Score, flagged ingredients, nutrition levels, diet fit, alternatives, save to favorites |
 | Skin result | Skin score with change since last check, photo quality and confidence, top priority, six-zone face map, nine concern levels, AM/PM routine with key ingredients, use as my routine |
 | Diary | Skin journal: today's check, AM/PM routine checklist, mood, sleep, water, stress, tags and notes; history timeline with photo compare; trends and patterns between diary entries and skin score; skin goals; product scan history |
-| Explore | Short, plain-language reads ordered by your health focus |
+| Explore | 200+ live articles from public health RSS feeds (`/api/feed`), ranked for each person's condition, details, symptoms and skin goals, with the reason shown; plus quick guides |
 | Profile | Health profile, symptoms, language (EN, ID, AR with RTL, FR, ZH), sign out |
+
+## Supabase setup (once)
+
+Open Supabase Dashboard, SQL Editor, paste `supabase/setup.sql` and run it. It creates `skin_checks`, `diary_logs`, `user_settings`, a private `skin-photos` storage bucket, adds `language` to `profiles` and `category` to `scans`, and sets Row Level Security so each person only sees their own rows.
+
+Until it is run, the app still works, but the diary stays on the device (Profile shows Backup: This device only).
 
 ## Data notes
 
-- Product scans are stored in the Supabase `scans` table.
-- The skin diary (skin checks, small photo thumbnails, daily logs, routine, goals) is stored on the device only: localStorage plus IndexedDB for photos. Nothing from the diary is uploaded except the photo sent for analysis.
-- The `profiles` table has no `language` column, so language is stored on the device. Add a `language text` column if you want it to follow the account.
+- Everything follows the account: profile, product scans, skin checks and their photos (private bucket), diary days, routine, goals and favorites. The device keeps a copy so the app opens instantly and works offline; changes sync in the background.
+- Sessions persist in localStorage and refresh automatically. Each Vercel preview URL is a different site to the browser, so use the production domain to stay signed in.
 
 ## QA
 
-`qa/e2e.py` runs every flow in headless Chromium with a fake camera, mocked Supabase and a mocked `/api/chat`.
+`qa/e2e.py` runs every flow in headless Chromium with a fake camera, mocked Supabase (including the diary tables and storage), a mocked `/api/chat` and a fixture `/api/feed`. `node qa/fixtures/make-feed.mjs` tests RSS parsing and ranking and regenerates the fixture.
 
 ```bash
 pip install playwright && python -m playwright install chromium

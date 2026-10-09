@@ -170,7 +170,7 @@ export const CompareView: React.FC<{
     <div className="flex-1 min-w-0">
       <p className="text-[13px] font-semibold text-ink-muted mb-1.5">{t(label)}</p>
       <div className="relative">
-        <Thumb photoId={s.photoId} className="w-full aspect-[3/4] rounded-3xl" label={t('noPhoto')} />
+        <Thumb photoId={s.photoId} photoPath={s.photoPath} className="w-full aspect-[3/4] rounded-3xl" label={t('noPhoto')} />
         <span className="absolute bottom-2 start-2 h-8 px-3 rounded-full bg-white/90 backdrop-blur text-[13px] font-semibold text-ink inline-flex items-center">{formatDate(s.timestamp)}</span>
       </div>
     </div>

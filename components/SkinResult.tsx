@@ -97,7 +97,7 @@ const SkinResult: React.FC<Props> = ({ t, rtl, item, previous, routineSaved, onC
 
           {/* Score hero */}
           <motion.section {...reveal(0)} className="rounded-[28px] bg-ink text-white p-4 mb-3 flex items-center gap-4">
-            <Thumb photoId={item.photoId} className="w-[84px] h-[104px] rounded-2xl shrink-0" label={t('noPhoto')} />
+            <Thumb photoId={item.photoId} photoPath={item.photoPath} className="w-[84px] h-[104px] rounded-2xl shrink-0" label={t('noPhoto')} />
             <div className="flex-1 min-w-0">
               <p className="text-[14px] text-white/70">{t('skinScoreLabel')}</p>
               <p className="text-[46px] leading-none font-semibold tracking-[-0.02em] tabular-nums mt-1">{shownScore}</p>

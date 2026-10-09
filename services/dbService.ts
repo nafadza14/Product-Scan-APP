@@ -46,18 +46,28 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
   }
 };
 
+const columnMissing = (e: any) => e && (e.code === 'PGRST204' || e.code === '42703' || /column|schema cache/i.test(String(e.message)));
+
 export const updateUserProfile = async (userId: string, profile: UserProfile) => {
   cacheProfile(userId, profile);
-  const { error } = await supabase.from('profiles').upsert({
+  const row: Record<string, unknown> = {
     id: userId,
     name: profile.name,
     condition: profile.condition,
     custom_condition_name: profile.customConditionName || null,
     additional_context: profile.additionalContext,
     current_symptoms: profile.currentSymptoms,
+    language: profile.language,
     updated_at: new Date()
-  });
+  };
+  let { error } = await supabase.from('profiles').upsert(row);
+  // Before supabase/setup.sql is run there is no language column: save everything else.
+  if (columnMissing(error)) {
+    delete row.language;
+    ({ error } = await supabase.from('profiles').upsert(row));
+  }
   if (error) console.error('Error updating profile:', error.message);
+  return !error;
 };
 
 // ---------- Favorites (device level, keyed by scan id) ----------
@@ -94,9 +104,7 @@ export const getScanHistory = async (userId: string): Promise<ScanHistoryItem[]>
   try {
     const { data, error } = await supabase
       .from('scans')
-      .select(
-        'id, timestamp, product_name, icon, status, explanation, ingredients, alternatives, score, nutri_score, full_ingredient_list, nutrition_advisor'
-      )
+      .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(HISTORY_LIMIT);
@@ -110,8 +118,8 @@ export const getScanHistory = async (userId: string): Promise<ScanHistoryItem[]>
         timestamp: Number(row.timestamp) || Date.now(),
         productName: row.product_name,
         // The scans table has no category or diet columns, so prefer what this device saw.
-        category: local?.category || guessCategory(row.product_name || ''),
-        dietarySuitability: local?.dietarySuitability,
+        category: row.category || local?.category || guessCategory(row.product_name || ''),
+        dietarySuitability: row.dietary_suitability || local?.dietarySuitability,
         icon: row.icon,
         status: row.status,
         explanation: row.explanation || '',
@@ -136,7 +144,7 @@ export const getScanHistory = async (userId: string): Promise<ScanHistoryItem[]>
 };
 
 export const addScanResult = async (userId: string, result: ScanHistoryItem) => {
-  const { error } = await supabase.from('scans').insert({
+  const row: Record<string, unknown> = {
     id: result.id,
     user_id: userId,
     product_name: result.productName,
@@ -149,8 +157,16 @@ export const addScanResult = async (userId: string, result: ScanHistoryItem) => 
     score: result.score,
     nutri_score: result.nutriScore,
     full_ingredient_list: result.fullIngredientList,
-    nutrition_advisor: result.nutritionAdvisor
-  });
+    nutrition_advisor: result.nutritionAdvisor,
+    category: result.category,
+    dietary_suitability: result.dietarySuitability || null
+  };
+  let { error } = await supabase.from('scans').insert(row);
+  if (columnMissing(error)) {
+    delete row.category;
+    delete row.dietary_suitability;
+    ({ error } = await supabase.from('scans').insert(row));
+  }
   if (error) console.error('Error adding scan:', error.message);
 };
 

@@ -65,6 +65,7 @@ export const savePrefs = (userId: string, p: DiaryPrefs) => write(k('diaryPrefs'
 
 // ---------- Photos (IndexedDB) ----------
 
+const photoCache = new Map<string, string | null>();
 const DB_NAME = 'vitalSense_photos';
 const STORE = 'photos';
 
@@ -78,6 +79,7 @@ const openDb = (): Promise<IDBDatabase> =>
   });
 
 export const savePhoto = async (id: string, dataUrl: string) => {
+  photoCache.set(id, dataUrl);
   try {
     const db = await openDb();
     await new Promise<void>((resolve, reject) => {
@@ -89,7 +91,6 @@ export const savePhoto = async (id: string, dataUrl: string) => {
   } catch { /* photos are a nice-to-have */ }
 };
 
-const photoCache = new Map<string, string | null>();
 
 export const loadPhoto = async (id?: string): Promise<string | null> => {
   if (!id) return null;
@@ -101,7 +102,7 @@ export const loadPhoto = async (id?: string): Promise<string | null> => {
       req.onsuccess = () => resolve((req.result as string) || null);
       req.onerror = () => resolve(null);
     });
-    photoCache.set(id, v);
+    if (v) photoCache.set(id, v);
     return v;
   } catch {
     return null;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight, Globe, HeartPulse, LogOut, Pencil, ScanLine, UserRound } from 'lucide-react';
+import { ChevronRight, Cloud, Globe, HeartPulse, LogOut, Pencil, ScanLine, UserRound } from 'lucide-react';
 import { AppLanguage, UserProfile } from '../types';
 import { Translator, conditionLabel, languageOptions, optionLabel } from '../i18n';
 import { Avatar, Pressable, PrimaryButton, SecondaryButton } from './ui';
@@ -12,6 +12,7 @@ interface Props {
   email?: string;
   stats: { scans: number; saved: number; skin: number };
   hasApiKey: boolean;
+  cloudStatus?: 'unknown' | 'on' | 'not_set_up' | 'offline';
   onSignIn: (mode: 'signin' | 'signup') => void;
   onEditProfile: () => void;
   onUpdateSymptoms: () => void;
@@ -44,7 +45,7 @@ const Row: React.FC<{
   );
 };
 
-const ProfileView: React.FC<Props> = ({ t, rtl, user, language, email, stats, hasApiKey, onSignIn, onEditProfile, onUpdateSymptoms, onLanguage, onSignOut }) => {
+const ProfileView: React.FC<Props> = ({ t, rtl, user, language, email, stats, hasApiKey, cloudStatus = 'unknown', onSignIn, onEditProfile, onUpdateSymptoms, onLanguage, onSignOut }) => {
   const langName = languageOptions.find((l) => l.code === language)?.native;
 
   if (!user) {
@@ -126,6 +127,11 @@ const ProfileView: React.FC<Props> = ({ t, rtl, user, language, email, stats, ha
       <div className="rounded-3xl bg-white shadow-soft divide-y divide-canvas mb-6 overflow-hidden">
         <Row icon={<Globe size={18} />} label={t('language')} value={langName} onClick={onLanguage} rtl={rtl} />
         <Row icon={<ScanLine size={18} />} label={t('scanning')} value={hasApiKey ? t('scanningReady') : t('scanningOff')} />
+        <Row
+          icon={<Cloud size={18} />}
+          label={t('backup')}
+          value={t(cloudStatus === 'on' ? 'backupOn' : cloudStatus === 'not_set_up' ? 'backupNotSetUp' : cloudStatus === 'offline' ? 'backupOffline' : 'backupChecking')}
+        />
       </div>
 
       <div className="rounded-3xl bg-white shadow-soft overflow-hidden">

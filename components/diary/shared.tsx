@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ImageOff } from 'lucide-react';
-import { loadPhoto } from '../../services/diaryService';
+import { loadPhoto, savePhoto } from '../../services/diaryService';
+import { downloadPhoto } from '../../services/cloudSync';
 import { TranslationKey } from '../../i18n';
 import { ConcernId, SkinGoal, SkinZoneId } from '../../types';
 
@@ -57,15 +58,23 @@ export const SEV_COLORS = ['#A7B6B6', '#DB8F1F', '#E9733A', '#D2432F'];
 export const scoreColor = (n: number) => (n >= 75 ? '#2E8C68' : n >= 55 ? '#DB8F1F' : '#D2432F');
 
 /** A photo thumbnail loaded from this device's IndexedDB. */
-export const Thumb: React.FC<{ photoId?: string; className?: string; label: string }> = ({ photoId, className = '', label }) => {
+export const Thumb: React.FC<{ photoId?: string; photoPath?: string; className?: string; label: string }> = ({ photoId, photoPath, className = '', label }) => {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
-    loadPhoto(photoId).then((p) => alive && setSrc(p));
+    (async () => {
+      let p = await loadPhoto(photoId);
+      // Not on this device yet (new phone, cleared browser): fetch from private cloud storage and cache it.
+      if (!p && photoPath) {
+        p = await downloadPhoto(photoPath);
+        if (p && photoId) savePhoto(photoId, p);
+      }
+      if (alive) setSrc(p);
+    })();
     return () => {
       alive = false;
     };
-  }, [photoId]);
+  }, [photoId, photoPath]);
   return src ? (
     <img src={src} alt="" className={`object-cover ${className}`} />
   ) : (

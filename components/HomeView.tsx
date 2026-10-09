@@ -176,7 +176,7 @@ const HomeView: React.FC<Props> = ({
                 >
                   <div className="h-[112px] rounded-2xl bg-coral/10 flex items-center justify-center mb-3 relative overflow-hidden">
                     {r.item.photoId ? (
-                      <Thumb photoId={r.item.photoId} className="absolute inset-0 w-full h-full" label={t('skinCheck')} />
+                      <Thumb photoId={r.item.photoId} photoPath={r.item.photoPath} className="absolute inset-0 w-full h-full" label={t('skinCheck')} />
                     ) : (
                       <Smile size={30} className="text-coral" />
                     )}
