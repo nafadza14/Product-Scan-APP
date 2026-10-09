@@ -11,7 +11,9 @@ const readKey = () => {
     const v = (process.env[name] || '').trim().replace(/^['"]|['"]$/g, '');
     if (v) return v;
   }
-  return '';
+  // Fallback: an older variable name, used only if it holds a Sumopod-style key (sk-...).
+  const legacy = (process.env.API_KEY || '').trim().replace(/^['"]|['"]$/g, '');
+  return legacy.startsWith('sk-') ? legacy : '';
 };
 
 export const sumopodConfigured = () => !!readKey();
