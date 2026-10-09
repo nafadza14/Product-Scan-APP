@@ -2,7 +2,7 @@
 
 Scan a food or skincare label and see whether it suits your health profile. Check your skin with a selfie and get a simple routine.
 
-Built with React, Vite, Tailwind, Framer Motion, Supabase (auth and data) and Gemini (image analysis).
+Built with React, Vite, Tailwind, Framer Motion, Supabase (auth and data) and Sumopod (image analysis with `MiniMax-M3.1-Flash-Preview`).
 
 ## Run locally
 
@@ -10,15 +10,17 @@ Requires Node 18 or newer.
 
 ```bash
 npm install
-echo "GEMINI_API_KEY=your-key" > .env.local
+echo "SUMOPOD_API_KEY=your-key" > .env.local
 npm run dev
 ```
 
-Optional: set `GEMINI_MODEL` to pin a model. The default is `gemini-flash-latest`, which always points at Google's current Flash model.
+Optional: `SUMOPOD_MODEL` overrides the model (default `MiniMax-M3.1-Flash-Preview`), `SUMOPOD_BASE_URL` overrides the API base (default `https://ai.sumopod.com/v1`).
+
+The browser never sees the key. It posts to `/api/chat`; `api/chat.js` (Vercel) and the Vite dev server both forward that to Sumopod with the key added on the server.
 
 ## Deploy on Vercel
 
-Add `GEMINI_API_KEY` under Project Settings, Environment Variables, then redeploy. The key is read at build time.
+Add `SUMOPOD_API_KEY` under Project Settings, Environment Variables, then redeploy. The key is only read by the `/api/chat` function.
 
 ## What's in the app
 
@@ -36,15 +38,14 @@ Add `GEMINI_API_KEY` under Project Settings, Environment Variables, then redeplo
 
 - Product scans are stored in the Supabase `scans` table. Favorites and skin checks are stored on the device only (no photos are kept anywhere).
 - The `profiles` table has no `language` column, so language is stored on the device. Add a `language text` column if you want it to follow the account.
-- The Gemini key is used from the browser. For production, consider moving analysis into a Vercel serverless function so the key is not shipped to clients.
 
 ## QA
 
-`qa/e2e.py` runs every flow in headless Chromium with a fake camera, mocked Supabase and mocked Gemini.
+`qa/e2e.py` runs every flow in headless Chromium with a fake camera, mocked Supabase and a mocked `/api/chat`.
 
 ```bash
 pip install playwright && python -m playwright install chromium
-GEMINI_API_KEY=test-key npm run build
+npm run build
 npx vite preview --port 4173 &
 python3 qa/e2e.py   # screenshots in qa/out/
 ```

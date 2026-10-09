@@ -18,7 +18,6 @@ interface Props {
   onSeeAll: () => void;
   onFeeling: () => void;
   onProfile: () => void;
-  onChooseKey: () => void;
 }
 
 export const statusColor = (s: ScanStatus) => (s === ScanStatus.SAFE ? '#2E8C68' : s === ScanStatus.CAUTION ? '#DB8F1F' : '#D2432F');
@@ -44,8 +43,7 @@ const HomeView: React.FC<Props> = ({
   onOpenSkin,
   onSeeAll,
   onFeeling,
-  onProfile,
-  onChooseKey
+  onProfile
 }) => {
   const firstName = user?.name?.trim().split(/\s+/)[0];
   const recent = [...history.map((h) => ({ kind: 'product' as const, ts: h.timestamp, item: h })), ...skinHistory.map((s) => ({ kind: 'skin' as const, ts: s.timestamp, item: s }))]
@@ -76,11 +74,6 @@ const HomeView: React.FC<Props> = ({
           <div className="min-w-0">
             <p className="font-semibold text-ink text-[15px]">{t('apiMissingTitle')}</p>
             <p className="text-[14px] text-ink-muted leading-snug mt-0.5">{t('apiMissingBody')}</p>
-            {'aistudio' in window && (
-              <button onClick={onChooseKey} className="mt-2 text-[14px] font-semibold text-coral">
-                {t('chooseKey')}
-              </button>
-            )}
           </div>
         </motion.div>
       )}

@@ -1,4 +1,3 @@
-import { GoogleGenAI, Type, HarmCategory, HarmBlockThreshold } from '@google/genai';
 import {
   ScanResult,
   UserProfile,
@@ -8,7 +7,13 @@ import {
   SkinAnalysis,
   AnalysisError
 } from '../types';
-import { getApiKey, getModel } from './config';
+
+// JSON Schema type names (the schemas below are sent to the model inside the prompt).
+const Type = { OBJECT: 'object', STRING: 'string', NUMBER: 'number', BOOLEAN: 'boolean', ARRAY: 'array' } as const;
+
+// Requests go to our own endpoint (/api/chat), which adds the Sumopod key on the server.
+// In dev, vite.config.ts proxies it; on Vercel, api/chat.js handles it.
+const ENDPOINT = '/api/chat';
 
 const LANGUAGE_NAMES: Record<AppLanguage, string> = {
   [AppLanguage.EN]: 'English',
@@ -17,14 +22,6 @@ const LANGUAGE_NAMES: Record<AppLanguage, string> = {
   [AppLanguage.FR]: 'French',
   [AppLanguage.ZH]: 'Simplified Chinese'
 };
-
-const SAFETY = [
-  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE }
-];
-
 
 const clamp = (n: unknown, fallback = 50) => {
   const v = typeof n === 'number' && Number.isFinite(n) ? n : fallback;
@@ -47,36 +44,68 @@ WRITING STYLE for every text field:
 - Never use em dashes or en dashes. Use commas, periods or colons instead.
 - Never diagnose. Say what to watch for and when to ask a doctor.`;
 
-async function callModel(imageBase64: string, systemInstruction: string, prompt: string, schema: any) {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new AnalysisError('missing_key');
-
-  const ai = new GoogleGenAI({ apiKey });
-  let response;
+const extractJSON = (text: string) => {
+  const t = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
   try {
-    response = await ai.models.generateContent({
-      model: getModel(),
-      contents: {
-        parts: [{ inlineData: { mimeType: 'image/jpeg', data: imageBase64 } }, { text: prompt }]
-      },
-      config: {
-        systemInstruction,
-        responseMimeType: 'application/json',
-        safetySettings: SAFETY,
-        responseSchema: schema
-      }
+    return JSON.parse(t);
+  } catch {
+    const first = t.indexOf('{');
+    const last = t.lastIndexOf('}');
+    if (first >= 0 && last > first) return JSON.parse(t.slice(first, last + 1));
+    throw new Error('no json');
+  }
+};
+
+async function callModel(imageBase64: string, systemInstruction: string, prompt: string, schema: any) {
+  const system = `${systemInstruction}
+
+Reply with ONE JSON object only, no markdown and no extra text. It must match this JSON Schema:
+${JSON.stringify(schema)}`;
+
+  let res: Response;
+  try {
+    res = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: system },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } }
+            ]
+          }
+        ],
+        temperature: 0.2,
+        max_tokens: 2500
+      })
     });
   } catch (err: any) {
-    const msg = String(err?.message || '');
-    if (/api key|API_KEY_INVALID|permission|403/i.test(msg)) throw new AnalysisError('missing_key', msg);
-    if (/fetch|network|Failed to fetch|ECONN|timeout|503|429/i.test(msg)) throw new AnalysisError('network', msg);
-    throw new AnalysisError('unknown', msg);
+    throw new AnalysisError('network', String(err?.message || err));
   }
 
-  const text = response?.text;
-  if (!text) throw new AnalysisError('unknown', 'Empty response');
+  const raw = await res.text();
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403 || /missing_key|api key/i.test(raw)) throw new AnalysisError('missing_key', raw.slice(0, 300));
+    if (res.status === 429 || res.status >= 500) throw new AnalysisError('network', raw.slice(0, 300));
+    throw new AnalysisError('unknown', raw.slice(0, 300));
+  }
+
+  let text = '';
   try {
-    return JSON.parse(text.trim().replace(/^```json\s*|```$/g, ''));
+    const data = JSON.parse(raw);
+    const content = data?.choices?.[0]?.message?.content;
+    text = Array.isArray(content) ? content.map((c: any) => c?.text || '').join('') : String(content || '');
+  } catch {
+    throw new AnalysisError('unknown', 'Invalid response');
+  }
+  // Some models think out loud first; drop any <think> block.
+  text = text.replace(/<think>[\s\S]*?<\/think>/gi, '');
+  if (!text.trim()) throw new AnalysisError('unknown', 'Empty response');
+  try {
+    return extractJSON(text);
   } catch {
     throw new AnalysisError('unknown', 'Invalid JSON');
   }

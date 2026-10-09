@@ -17,7 +17,7 @@ import {
   setFavoriteIds,
   updateUserProfile
 } from './services/dbService';
-import { getApiKey } from './services/config';
+import { checkAiConfigured } from './services/config';
 import HomeView from './components/HomeView';
 import { ExploreView, ArticlePage } from './components/ExploreView';
 import LibraryView from './components/LibraryView';
@@ -58,15 +58,6 @@ const detectLanguage = (): AppLanguage => {
   return AppLanguage.EN;
 };
 
-const hasAiStudioKey = async () => {
-  try {
-    const s = (window as any).aistudio;
-    return s?.hasSelectedApiKey ? !!(await s.hasSelectedApiKey()) : false;
-  } catch {
-    return false;
-  }
-};
-
 const App: React.FC = () => {
   const [booting, setBooting] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
@@ -76,7 +67,7 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<ScanHistoryItem[]>([]);
   const [skinHistory, setSkinHistory] = useState<SkinScanItem[]>([]);
   const [deviceLang, setDeviceLang] = useState<AppLanguage>(detectLanguage);
-  const [hasApiKey, setHasApiKey] = useState(!!getApiKey());
+  const [hasApiKey, setHasApiKey] = useState(true);
   const [tab, setTab] = useState<Tab>('home');
   const [overlays, setOverlays] = useState<Overlay[]>([]);
 
@@ -170,7 +161,7 @@ const App: React.FC = () => {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      setHasApiKey(!!getApiKey() || (await hasAiStudioKey()));
+      checkAiConfigured().then(setHasApiKey);
       try {
         const { data } = await supabase.auth.getSession();
         const s = data.session;
@@ -240,22 +231,13 @@ const App: React.FC = () => {
   const startScan = async (mode: ScanMode) => {
     if (!userId) return open({ k: 'auth', mode: 'signup' });
     if (!user) return open({ k: 'onboarding', mode: 'new' });
-    if (!hasApiKey) {
-      try {
-        const s = (window as any).aistudio;
-        if (s?.openSelectKey) {
-          await s.openSelectKey();
-          setHasApiKey(true);
-        }
-      } catch { /* ignore */ }
-    }
     open({ k: 'scanner', mode });
   };
 
   const analyze = useCallback(
     async (mode: ScanMode, base64: string) => {
       if (!user || !userId) throw new Error('No profile');
-      const svc = await import('./services/geminiService');
+      const svc = await import('./services/aiService');
       if (mode === 'product') {
         const result = await svc.analyzeImage(base64, user);
         const item: ScanHistoryItem = { ...result, id: crypto.randomUUID(), timestamp: Date.now(), isFavorite: false };
@@ -449,12 +431,6 @@ const App: React.FC = () => {
                 onSeeAll={() => setTab('library')}
                 onFeeling={() => open({ k: 'onboarding', mode: 'symptoms' })}
                 onProfile={() => setTab('profile')}
-                onChooseKey={async () => {
-                  try {
-                    await (window as any).aistudio?.openSelectKey?.();
-                    setHasApiKey(true);
-                  } catch { /* ignore */ }
-                }}
               />
             )}
             {tab === 'explore' && <ExploreView t={t} user={user} onOpen={(a) => open({ k: 'article', article: a })} />}

@@ -1,26 +1,41 @@
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, (process as any).cwd(), '');
-  const pick = (...keys: string[]) => {
-    for (const k of keys) {
-      const v = process.env[k] || env[k];
-      if (v) return v;
-    }
-    return '';
+// Serves /api/chat during `npm run dev` / `npm run preview` with the same handler Vercel uses.
+const sumopodApi = (): Plugin => {
+  const middleware = async (req: any, res: any, next: any) => {
+    if (!req.url?.startsWith('/api/chat')) return next();
+    const { handleChat } = await import('./server/sumopod.js');
+    let raw = '';
+    req.on('data', (c: Buffer) => (raw += c));
+    req.on('end', async () => {
+      try {
+        const { status, body } = await handleChat(req.method, raw ? JSON.parse(raw) : {});
+        res.statusCode = status;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(body);
+      } catch (err: any) {
+        res.statusCode = 502;
+        res.end(JSON.stringify({ error: 'upstream_error', message: String(err?.message || err) }));
+      }
+    });
   };
+  return {
+    name: 'sumopod-api',
+    configureServer: (server) => void server.middlewares.use(middleware),
+    configurePreviewServer: (server) => void server.middlewares.use(middleware)
+  };
+};
+
+export default defineConfig(({ mode }) => {
+  // Make .env / .env.local values (SUMOPOD_API_KEY, SUMOPOD_MODEL) visible to the dev API handler.
+  const env = loadEnv(mode, (process as any).cwd(), '');
+  for (const k of ['SUMOPOD_API_KEY', 'SUMOPOD_MODEL', 'SUMOPOD_BASE_URL']) {
+    if (env[k] && !process.env[k]) process.env[k] = env[k];
+  }
 
   return {
-    plugins: [react()],
-    define: {
-      // Accept the name the README documents (GEMINI_API_KEY) as well as the older ones.
-      'process.env.API_KEY': JSON.stringify(pick('GEMINI_API_KEY', 'API_KEY', 'VITE_API_KEY')),
-      'process.env.GEMINI_MODEL': JSON.stringify(pick('GEMINI_MODEL') || 'gemini-flash-latest'),
-    },
-    build: {
-      outDir: 'dist',
-      chunkSizeWarningLimit: 900,
-    },
+    plugins: [react(), sumopodApi()],
+    build: { outDir: 'dist', chunkSizeWarningLimit: 900 }
   };
 });

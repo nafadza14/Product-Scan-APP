@@ -4,10 +4,10 @@ End-to-end QA for VitalSense.
 Runs the built app (vite preview on :4173) in headless Chromium with:
   - a fake camera that shows a product label (qa/assets/label.png)
   - Supabase auth + REST mocked in-process
-  - Gemini mocked in-process (success, not recognized, network failure)
+  - AI endpoint /api/chat mocked in-process (success, not recognized, network failure)
 
 Usage:
-  GEMINI_API_KEY=test-key npm run build && npx vite preview --port 4173 &
+  npm run build && npx vite preview --port 4173 &
   python3 qa/e2e.py
 Screenshots land in qa/out/.
 """
@@ -95,7 +95,9 @@ SKIN = {
 }
 
 
-def gemini_route(route: Route):
+def ai_route(route: Route):
+    if route.request.method == "GET":
+        return route.fulfill(status=200, content_type="application/json", body=json.dumps({"configured": True, "model": "MiniMax-M3.1-Flash-Preview"}))
     body = route.request.post_data or ""
     state["requests"].append(("gemini", body[:200]))
     if state["gemini"] == "network":
@@ -112,7 +114,7 @@ def gemini_route(route: Route):
     route.fulfill(
         status=200,
         content_type="application/json",
-        body=json.dumps({"candidates": [{"content": {"role": "model", "parts": [{"text": json.dumps(payload)}]}, "finishReason": "STOP"}]}),
+        body=json.dumps({"id": "chatcmpl-qa", "object": "chat.completion", "choices": [{"index": 0, "message": {"role": "assistant", "content": "<think>checking</think>\n```json\n" + json.dumps(payload) + "\n```"}, "finish_reason": "stop"}]}),
     )
 
 
@@ -217,7 +219,7 @@ def main():
             permissions=["camera"],
         )
         ctx.route(re.compile(r".*supabase\.co/.*"), supabase_route)
-        ctx.route(re.compile(r".*generativelanguage\.googleapis\.com/.*"), gemini_route)
+        ctx.route(re.compile(r".*/api/chat$"), ai_route)
         ctx.route(re.compile(r".*images\.unsplash\.com/.*"), lambda r: r.fulfill(status=200, content_type="image/jpeg", body=PLACEHOLDER))
 
         page = ctx.new_page()
