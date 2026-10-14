@@ -25,7 +25,8 @@ const Type = { OBJECT: 'object', STRING: 'string', NUMBER: 'number', BOOLEAN: 'b
 
 // Requests go to our own endpoint (/api/chat), which adds the Sumopod key on the server.
 // In dev, vite.config.ts proxies it; on Vercel, api/chat.js handles it.
-const ENDPOINT = apiUrl('/api/chat');
+// Resolved per call: the native bridge decides the base URL at runtime.
+const endpoint = () => apiUrl('/api/chat');
 
 const LANGUAGE_NAMES: Record<AppLanguage, string> = {
   [AppLanguage.EN]: 'English',
@@ -76,7 +77,7 @@ ${JSON.stringify(schema)}`;
 
   let res: Response;
   try {
-    res = await fetch(ENDPOINT, {
+    res = await fetch(endpoint(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

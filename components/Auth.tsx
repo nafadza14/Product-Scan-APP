@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertCircle, Copy, Check, Eye, EyeOff, MailCheck } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { isNative, NATIVE_AUTH_REDIRECT, openAuthBrowser } from '../services/native';
 import { Translator } from '../i18n';
 import { NavBar, Pressable, PrimaryButton, SecondaryButton } from './ui';
 
@@ -70,10 +71,21 @@ const Auth: React.FC<Props> = ({ t, rtl, initialMode, onClose }) => {
     setLoading('google');
     setError(null);
     setRedirectError(false);
-    const { error: err } = await supabase.auth.signInWithOAuth({
+    // Native app: Supabase returns the URL, we open it in the in-app browser and come back via the
+    // online.scanything.app://auth-callback deep link (handled in services/native.ts).
+    const native = isNative();
+    const { data, error: err } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: redirectUrl(), queryParams: { access_type: 'offline', prompt: 'select_account' } }
+      options: {
+        redirectTo: native ? NATIVE_AUTH_REDIRECT : redirectUrl(),
+        skipBrowserRedirect: native,
+        queryParams: { access_type: 'offline', prompt: 'select_account' }
+      }
     });
+    if (!err && native && data?.url) {
+      await openAuthBrowser(data.url, () => setLoading(null));
+      return;
+    }
     if (err) {
       setError(t('errRedirect'));
       setRedirectError(true);

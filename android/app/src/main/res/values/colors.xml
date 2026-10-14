@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches the web UI (index.css color-scheme: light, theme-color #FFFFFF). -->
+    <color name="scanything_background">#FFFFFF</color>
+    <color name="scanything_system_bar">#FFFFFF</color>
+</resources>

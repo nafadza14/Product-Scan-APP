@@ -1,5 +1,18 @@
 import { defineConfig, loadEnv, Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+// @ts-ignore -- plain JS helper shared with scripts/build-ota.mjs (no type declarations)
+import { resolveBuildId, VERSION_FILE } from './scripts/build-id.mjs';
+
+// One build id per build: injected as __BUILD_ID__ and written to dist/version.json, which
+// scripts/build-ota.mjs reads so the OTA manifest version always matches the running bundle.
+const BUILD_ID: string = resolveBuildId();
+const buildIdFile = (): Plugin => ({
+  name: 'build-id-file',
+  apply: 'build',
+  generateBundle() {
+    this.emitFile({ type: 'asset', fileName: VERSION_FILE, source: JSON.stringify({ version: BUILD_ID }) + '\n' });
+  }
+});
 
 // Serves /api/chat and /api/feed during `npm run dev` / `npm run preview` with the same handler Vercel uses.
 const sumopodApi = (): Plugin => {
@@ -49,7 +62,8 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    plugins: [react(), sumopodApi()],
+    plugins: [react(), sumopodApi(), buildIdFile()],
+    define: { __BUILD_ID__: JSON.stringify(BUILD_ID) },
     build: { outDir: 'dist', chunkSizeWarningLimit: 900 }
   };
 });

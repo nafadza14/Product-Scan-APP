@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Base application theme. -->
     <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
@@ -9,14 +9,37 @@
         <item name="colorAccent">@color/colorAccent</item>
     </style>
 
-    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <!--
+        Theme used once the app is running (BridgeActivity applies it after the splash).
+        The web UI is light-only, so this is a Light theme in every system mode: the WebView then
+        reports prefers-color-scheme: light and nothing native turns dark.
+        Edge to edge: the app targets SDK 36, so Android 15+ always draws behind the system bars;
+        Capacitor's SystemBars plugin pads or passes the insets to the page (CSS env(safe-area-inset-*) or the
+        injected safe-area variables). The colours below cover older versions and the padded area so both
+        bars read as white with dark icons, the same as the web UI.
+    -->
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <item name="android:windowBackground">@color/scanything_background</item>
+        <item name="android:statusBarColor">@color/scanything_system_bar</item>
+        <item name="android:navigationBarColor">@color/scanything_system_bar</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
+        <item name="android:navigationBarDividerColor" tools:targetApi="28">@android:color/transparent</item>
+        <item name="android:enforceStatusBarContrast" tools:targetApi="29">false</item>
+        <item name="android:enforceNavigationBarContrast" tools:targetApi="29">false</item>
     </style>
 
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <item name="windowSplashScreenBackground">@color/scanything_background</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
+        <item name="android:statusBarColor">@color/scanything_system_bar</item>
+        <item name="android:navigationBarColor">@color/scanything_system_bar</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
     </style>
 </resources>

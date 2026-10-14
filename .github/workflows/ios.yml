@@ -1,0 +1,267 @@
+name: iOS
+
+# Builds the iOS app when native code or dependencies change. Web-only changes reach installed
+# apps through live updates, so they do not need a new binary.
+#   - Always: unsigned simulator build (proves the Xcode project still compiles).
+#   - When all App Store Connect / signing secrets are set: archive, export IPA, upload to TestFlight.
+# The Capacitor 8 project is Swift Package Manager based (ios/App/CapApp-SPM, no Podfile), so we build
+# ios/App/App.xcodeproj directly with the auto-generated "App" scheme. See docs/CI.md for the secrets.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ios/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'capacitor.config.ts'
+      - '.github/workflows/ios.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ios/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'capacitor.config.ts'
+      - '.github/workflows/ios.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      # Secrets cannot be used in `if:` directly, so expose whether the full release set exists.
+      HAS_IOS_RELEASE: >-
+        ${{ secrets.APP_STORE_CONNECT_API_KEY_ID != '' && secrets.APP_STORE_CONNECT_ISSUER_ID != ''
+        && secrets.APP_STORE_CONNECT_API_KEY_P8 != '' && secrets.IOS_DIST_CERT_P12_BASE64 != ''
+        && secrets.IOS_DIST_CERT_PASSWORD != '' && secrets.IOS_PROVISIONING_PROFILE_BASE64 != '' }}
+      # Web build settings baked into the bundled copy of the app.
+      VITE_API_BASE: https://app.scanything.online
+      VITE_REVENUECAT_IOS_KEY: ${{ secrets.VITE_REVENUECAT_IOS_KEY }}
+      VITE_REVENUECAT_ANDROID_KEY: ${{ secrets.VITE_REVENUECAT_ANDROID_KEY }}
+      VITE_PAYWALL_MODE: ${{ vars.VITE_PAYWALL_MODE }}
+      VITE_AMAZON_TAG: ${{ vars.VITE_AMAZON_TAG }}
+      VITE_SHOPEE_AFF_ID: ${{ vars.VITE_SHOPEE_AFF_ID }}
+      # Same build id Vercel uses for this commit, so the bundled web app matches the live one.
+      VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
+      XCODE_PROJECT: ios/App/App.xcodeproj
+      XCODE_SCHEME: App
+      SPM_DIR: ${{ github.workspace }}/.spm
+    steps:
+      - uses: actions/checkout@v4
+
+      # Capacitor 8 needs Xcode 26+.
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Version name from package.json
+        run: echo "VERSION_NAME=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Sync Capacitor (ios)
+        run: npx cap sync ios
+
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.SPM_DIR }}
+          key: spm-${{ runner.os }}-${{ hashFiles('ios/App/CapApp-SPM/Package.swift', 'package-lock.json') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Resolve Swift packages
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project "$XCODE_PROJECT" -scheme "$XCODE_SCHEME" \
+            -clonedSourcePackagesDirPath "$SPM_DIR"
+
+      - name: Build for simulator (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project "$XCODE_PROJECT" -scheme "$XCODE_SCHEME" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData-sim" \
+            -clonedSourcePackagesDirPath "$SPM_DIR" \
+            -skipPackagePluginValidation -skipMacroValidation \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            | tee "$RUNNER_TEMP/xcodebuild-sim.log" | grep -E "error:|\*\* BUILD" || true
+          grep -q "\*\* BUILD SUCCEEDED \*\*" "$RUNNER_TEMP/xcodebuild-sim.log"
+
+      # ---------- Release (TestFlight), only when every secret is present ----------
+
+      - name: Install distribution certificate and provisioning profile
+        if: env.HAS_IOS_RELEASE == 'true' && github.event_name != 'pull_request'
+        env:
+          IOS_DIST_CERT_P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          CERT="$RUNNER_TEMP/dist.p12"
+          PROFILE="$RUNNER_TEMP/dist.mobileprovision"
+
+          echo "$IOS_DIST_CERT_P12_BASE64" | base64 --decode > "$CERT"
+          echo "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$PROFILE"
+
+          # Temporary keychain holding only the distribution identity.
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$CERT" -P "$IOS_DIST_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          # Keep the existing search list and put ours first (word splitting is intended here).
+          # shellcheck disable=SC2046
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm -f "$CERT"
+
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN" | grep -Eo '[0-9A-F]{40}' | head -n 1 || true)"
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::No code signing identity found in IOS_DIST_CERT_P12_BASE64"; exit 1
+          fi
+
+          # Read profile name, UUID and team from the profile itself.
+          security cms -D -i "$PROFILE" > "$RUNNER_TEMP/profile.plist"
+          PROFILE_UUID="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/profile.plist")"
+          PROFILE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/profile.plist")"
+          TEAM_ID="$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$RUNNER_TEMP/profile.plist")"
+          # Xcode 16+ reads UserData; older Xcode reads MobileDevice. Install to both.
+          for d in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" "$HOME/Library/MobileDevice/Provisioning Profiles"; do
+            mkdir -p "$d"
+            cp "$PROFILE" "$d/$PROFILE_UUID.mobileprovision"
+          done
+
+          {
+            echo "SIGNING_KEYCHAIN=$KEYCHAIN"
+            echo "SIGNING_IDENTITY=$IDENTITY"
+            echo "PROFILE_NAME=$PROFILE_NAME"
+            echo "TEAM_ID=$TEAM_ID"
+          } >> "$GITHUB_ENV"
+          echo "Signing with team $TEAM_ID, profile \"$PROFILE_NAME\""
+
+      - name: Switch the App target to manual signing
+        if: env.HAS_IOS_RELEASE == 'true' && github.event_name != 'pull_request'
+        # Set on the App target only (not on the command line), because command-line signing
+        # overrides also hit Swift package targets and break the archive. Not committed.
+        run: |
+          python3 - <<'PY'
+          import os, re, sys
+          path = os.path.join(os.environ["XCODE_PROJECT"], "project.pbxproj")
+          src = open(path, encoding="utf-8").read()
+          name = os.environ["PROFILE_NAME"].replace('"', '\\"')
+          repl = (
+              "CODE_SIGN_STYLE = Manual;\n"
+              f"\t\t\t\tDEVELOPMENT_TEAM = {os.environ['TEAM_ID']};\n"
+              f"\t\t\t\tCODE_SIGN_IDENTITY = \"{os.environ['SIGNING_IDENTITY']}\";\n"
+              f"\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"{name}\";"
+          )
+          out, n = re.subn(r"CODE_SIGN_STYLE = Automatic;", lambda m: repl, src)
+          if n == 0:
+              sys.exit("No CODE_SIGN_STYLE = Automatic in App target; project layout changed")
+          open(path, "w", encoding="utf-8").write(out)
+          print(f"Patched {n} build configurations")
+          PY
+
+      - name: Archive
+        if: env.HAS_IOS_RELEASE == 'true' && github.event_name != 'pull_request'
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -project "$XCODE_PROJECT" -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData-release" \
+            -clonedSourcePackagesDirPath "$SPM_DIR" \
+            -skipPackagePluginValidation -skipMacroValidation \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            MARKETING_VERSION="$VERSION_NAME" \
+            OTHER_CODE_SIGN_FLAGS="--keychain $SIGNING_KEYCHAIN" \
+            | tee "$RUNNER_TEMP/xcodebuild-archive.log" | grep -E "error:|\*\* ARCHIVE" || true
+          grep -q "\*\* ARCHIVE SUCCEEDED \*\*" "$RUNNER_TEMP/xcodebuild-archive.log"
+
+      - name: Export IPA
+        if: env.HAS_IOS_RELEASE == 'true' && github.event_name != 'pull_request'
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>export</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>signingCertificate</key><string>${SIGNING_IDENTITY}</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>online.scanything.app</key><string>${PROFILE_NAME}</string>
+            </dict>
+            <key>uploadSymbols</key><true/>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export"
+          IPA="$(find "$RUNNER_TEMP/export" -maxdepth 1 -name '*.ipa' | head -n 1)"
+          test -f "$IPA"
+          echo "IPA_PATH=$IPA" >> "$GITHUB_ENV"
+
+      - name: Upload IPA artifact
+        if: env.HAS_IOS_RELEASE == 'true' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: scanything-ipa-${{ github.run_number }}
+          path: ${{ env.IPA_PATH }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload to TestFlight
+        if: env.HAS_IOS_RELEASE == 'true' && github.event_name != 'pull_request'
+        uses: apple-actions/upload-testflight-build@v3
+        with:
+          app-path: ${{ env.IPA_PATH }}
+          issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          api-key-id: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          api-private-key: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+          app-type: ios
+
+      - name: Upload build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-logs-${{ github.run_number }}
+          path: ${{ runner.temp }}/xcodebuild-*.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Clean up signing material
+        if: always()
+        run: |
+          if [ -n "${SIGNING_KEYCHAIN:-}" ]; then security delete-keychain "$SIGNING_KEYCHAIN" || true; fi
+          rm -f "$RUNNER_TEMP/dist.p12" "$RUNNER_TEMP/dist.mobileprovision" "$RUNNER_TEMP/profile.plist"
+          rm -f "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/"*.mobileprovision \
+                "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision

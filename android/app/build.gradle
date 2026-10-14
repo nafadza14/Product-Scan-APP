@@ -1,5 +1,23 @@
 apply plugin: 'com.android.application'
 
+// Versioning and release signing come from the environment so CI can set them without editing files.
+//   VERSION_CODE   integer, must increase with every Play upload (default 1)
+//   VERSION_NAME   user-visible version, e.g. 1.2.0 (default 1.0.0)
+//   ANDROID_KEYSTORE_PATH, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+//                  upload keystore; when any is missing the release build is left unsigned
+//                  and debug builds are unaffected.
+def envOr = { String name, String fallback ->
+    def v = System.getenv(name)
+    return (v != null && !v.trim().isEmpty()) ? v.trim() : fallback
+}
+def appVersionCode = envOr('VERSION_CODE', '1').toInteger()
+def appVersionName = envOr('VERSION_NAME', '1.0.0')
+def releaseKeystorePath = envOr('ANDROID_KEYSTORE_PATH', null)
+def releaseKeystorePassword = envOr('ANDROID_KEYSTORE_PASSWORD', null)
+def releaseKeyAlias = envOr('ANDROID_KEY_ALIAS', null)
+def releaseKeyPassword = envOr('ANDROID_KEY_PASSWORD', null)
+def hasReleaseSigning = [releaseKeystorePath, releaseKeystorePassword, releaseKeyAlias, releaseKeyPassword].every { it != null }
+
 android {
     namespace = "online.scanything.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +25,8 @@ android {
         applicationId "online.scanything.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode appVersionCode
+        versionName appVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +34,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseKeystorePath)
+                storePassword releaseKeystorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useState } from 'react';
 import { motion, animate, useMotionValue, useTransform, HTMLMotionProps, MotionValue } from 'framer-motion';
 import { ChevronLeft, X } from 'lucide-react';
+import { nativeHaptic } from '../services/native';
 
 // ---------- Motion tokens ----------
 
@@ -12,6 +13,7 @@ export const softSpring = { type: 'spring', stiffness: 500, damping: 34 } as con
 
 export const haptic = (ms = 8) => {
   try {
+    if (nativeHaptic(ms)) return;
     if ('vibrate' in navigator) navigator.vibrate(ms);
   } catch { /* unsupported */ }
 };

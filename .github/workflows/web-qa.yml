@@ -1,0 +1,70 @@
+name: Web QA
+
+# Builds the web app and runs the Playwright end-to-end suite (qa/e2e.py) against `vite preview`.
+# Vercel deploys main on its own; this workflow is the gate that tells you whether that deploy is healthy.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-qa-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Install ffmpeg (fake camera feed)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Install Playwright Chromium
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Start vite preview
+        run: |
+          nohup npx vite preview --port 4173 --strictPort > qa-preview.log 2>&1 &
+          npx --yes wait-on@8 --timeout 60000 http-get://localhost:4173/
+
+      - name: Run end-to-end suite
+        run: python3 qa/e2e.py
+
+      - name: Upload QA output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-out-${{ github.run_number }}
+          path: |
+            qa/out
+            qa-preview.log
+          if-no-files-found: ignore
+          retention-days: 14

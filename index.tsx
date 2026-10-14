@@ -8,6 +8,8 @@ import '@fontsource/onest/700.css';
 import '@fontsource/ibm-plex-sans-arabic/arabic-400.css';
 import '@fontsource/ibm-plex-sans-arabic/arabic-600.css';
 import './index.css';
+import { initNative } from './services/native';
+import { initLiveUpdate } from './services/liveUpdate';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('Root element not found');
@@ -17,3 +19,6 @@ ReactDOM.createRoot(rootElement).render(
     <App />
   </React.StrictMode>
 );
+
+initNative();
+initLiveUpdate();

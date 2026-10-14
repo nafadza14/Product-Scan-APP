@@ -3,7 +3,24 @@
     "api/chat.js": { "maxDuration": 60 },
     "api/feed.js": { "maxDuration": 30 }
   },
+  "headers": [
+    {
+      "source": "/ota/latest.json",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, max-age=0" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Content-Type", "value": "application/json; charset=utf-8" }
+      ]
+    },
+    {
+      "source": "/ota/bundle-(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
+      ]
+    }
+  ],
   "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/((?!api/|ota/).*)", "destination": "/index.html" }
   ]
 }

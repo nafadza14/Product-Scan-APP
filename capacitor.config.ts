@@ -1,14 +1,32 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-// Native shell for App Store and Google Play. The web build (dist) is bundled into the app.
-// Build with VITE_API_BASE pointing at the deployed site so /api calls reach the server.
+// One codebase for web, Android and iOS. The native apps bundle the web build (dist) and then keep
+// themselves current with live updates: every web deploy publishes a bundle at
+// https://app.scanything.online/ota/latest.json, which the apps download and switch to on next launch.
 const config: CapacitorConfig = {
   appId: 'online.scanything.app',
   appName: 'Scanything',
   webDir: 'dist',
   backgroundColor: '#FFFFFF',
-  ios: { contentInset: 'never' },
-  android: { allowMixedContent: false }
+  ios: { contentInset: 'never', scheme: 'Scanything' },
+  android: { allowMixedContent: false },
+  plugins: {
+    CapacitorUpdater: {
+      // We drive updates ourselves from services/liveUpdate.ts against our own manifest.
+      autoUpdate: false,
+      appReadyTimeout: 15000,
+      resetWhenUpdate: true,
+      // Self-hosted: send no usage statistics to Capgo's servers.
+      statsUrl: ''
+    },
+    SplashScreen: {
+      launchAutoHide: false,
+      backgroundColor: '#FFFFFF',
+      showSpinner: false
+    },
+    StatusBar: { style: 'LIGHT', backgroundColor: '#FFFFFF', overlaysWebView: true },
+    Keyboard: { resize: 'native' }
+  }
 };
 
 export default config;
