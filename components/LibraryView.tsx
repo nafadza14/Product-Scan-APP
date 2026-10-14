@@ -112,7 +112,7 @@ const LibraryView: React.FC<Props> = ({ t, history, skinHistory, signedIn, onOpe
                 transition={{ type: 'spring', stiffness: 420, damping: 36 }}
               >
                 {r.kind === 'product' ? (
-                  <div className="rounded-3xl bg-white shadow-soft flex items-center">
+                  <div className="rounded-3xl bg-mist flex items-center">
                     <Pressable onClick={() => onOpenProduct(r.item)} className="flex-1 min-w-0 flex items-center gap-3 p-3 text-start">
                       <ProductIcon icon={r.item.icon} size={52} />
                       <span className="min-w-0">
@@ -137,7 +137,7 @@ const LibraryView: React.FC<Props> = ({ t, history, skinHistory, signedIn, onOpe
                     </span>
                   </div>
                 ) : (
-                  <Pressable onClick={() => onOpenSkin(r.item)} className="w-full rounded-3xl bg-white shadow-soft flex items-center gap-3 p-3 text-start">
+                  <Pressable onClick={() => onOpenSkin(r.item)} className="w-full rounded-3xl bg-mist flex items-center gap-3 p-3 text-start">
                     <span className="w-[52px] h-[52px] rounded-2xl bg-coral/10 text-coral flex items-center justify-center shrink-0">
                       <Smile size={24} />
                     </span>

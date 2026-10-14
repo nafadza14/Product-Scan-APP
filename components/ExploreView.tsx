@@ -186,7 +186,7 @@ export const ExploreView: React.FC<{
         )}
 
         {feed.status === 'error' && feed.items.length === 0 && (
-          <div className="rounded-3xl bg-white shadow-soft p-4 mb-6 flex items-center gap-3">
+          <div className="rounded-3xl bg-mist p-4 mb-6 flex items-center gap-3">
             <p className="flex-1 text-[14px] text-ink-muted leading-snug">{t('feedLoadingError')}</p>
             <Pressable onClick={feed.retry} className="h-10 px-4 rounded-full bg-ink text-white text-[14px] font-semibold shrink-0">
               {t('feedRetry')}
@@ -218,7 +218,7 @@ export const ExploreView: React.FC<{
             <h3 className="text-[20px] font-semibold text-ink mb-3">{t('feedQuickGuides')}</h3>
             <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-5 px-5 snap-x snap-mandatory pb-1">
               {guides.slice(0, 6).map((a) => (
-                <Pressable key={a.id} onClick={() => onOpen(a)} className="snap-start shrink-0 w-[220px] rounded-3xl bg-white shadow-soft overflow-hidden text-start">
+                <Pressable key={a.id} onClick={() => onOpen(a)} className="snap-start shrink-0 w-[220px] rounded-3xl bg-mist overflow-hidden text-start">
                   <img src={a.image} alt="" loading="lazy" onError={onImgError} referrerPolicy="no-referrer" className="w-full h-[110px] object-cover" />
                   <span className="block p-3">
                     <span className="block text-[12.5px] text-ink-muted mb-1">{t('minRead', { n: a.readTime })}</span>
@@ -236,7 +236,7 @@ export const ExploreView: React.FC<{
               const why = reasonLabel(t, lang, it.reason);
               return (
                 <li key={it.id}>
-                  <Pressable onClick={() => onOpenFeed(it)} className="w-full rounded-3xl bg-white p-3 flex gap-3.5 text-start shadow-soft">
+                  <Pressable onClick={() => onOpenFeed(it)} className="w-full rounded-3xl bg-mist p-3 flex gap-3.5 text-start">
                     <div className="w-[92px] h-[92px] rounded-2xl overflow-hidden bg-sage shrink-0">
                       <img src={feedImage(it)} alt="" loading="lazy" onError={onImgError} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                     </div>
@@ -253,7 +253,7 @@ export const ExploreView: React.FC<{
         )}
         <div ref={sentinel} />
         {shown < rest.length && (
-          <Pressable onClick={() => setShown((n) => n + 20)} className="w-full h-12 mt-4 rounded-full bg-white text-ink font-semibold shadow-soft">
+          <Pressable onClick={() => setShown((n) => n + 20)} className="w-full h-12 mt-4 rounded-full bg-mist text-ink font-semibold">
             {t('feedShowMore')}
           </Pressable>
         )}
@@ -262,7 +262,7 @@ export const ExploreView: React.FC<{
           <ul className="space-y-3">
             {guides.map((a) => (
               <li key={a.id}>
-                <Pressable onClick={() => onOpen(a)} className="w-full rounded-3xl bg-white p-3 flex gap-3.5 text-start shadow-soft">
+                <Pressable onClick={() => onOpen(a)} className="w-full rounded-3xl bg-mist p-3 flex gap-3.5 text-start">
                   <div className="w-[92px] h-[92px] rounded-2xl overflow-hidden bg-sage shrink-0">
                     <img src={a.image} alt="" loading="lazy" onError={onImgError} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                   </div>
@@ -329,7 +329,7 @@ export const FeedArticlePage: React.FC<{ t: Translator; rtl: boolean; lang: AppL
         className="relative -mt-8 px-6 pb-24"
       >
         <div className="flex flex-wrap gap-2 mb-3">
-          <span className="h-7 px-3 rounded-full bg-white text-ink text-[12.5px] font-semibold inline-flex items-center shadow-soft">{t(CAT_KEYS[item.category] || 'catWellness')}</span>
+          <span className="h-7 px-3 rounded-full bg-mist text-ink text-[12.5px] font-semibold inline-flex items-center">{t(CAT_KEYS[item.category] || 'catWellness')}</span>
           {item.lang !== lang && <span className="h-7 px-3 rounded-full bg-sage-soft text-ink text-[12.5px] font-semibold inline-flex items-center">{item.lang === 'en' ? t('feedInEnglish') : item.lang.toUpperCase()}</span>}
           {why && <span className="h-7 px-3 rounded-full bg-coral/10 text-coral text-[12.5px] font-semibold inline-flex items-center">{t('feedBecause', { x: why })}</span>}
         </div>

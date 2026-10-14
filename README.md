@@ -1,6 +1,6 @@
-# VitalSense
+# Scanything
 
-Scan a food or skincare label and see whether it suits your health profile. Check your skin with a selfie and get a simple routine.
+Scan food and skincare labels and see how they suit your body and your skin. What you eat shows on your skin: every product result also says how it is likely to affect your skin, based on your latest skin check. Built for women who care about both.
 
 Built with React, Vite, Tailwind, Framer Motion, Supabase (auth and data) and Sumopod (image analysis with `gemini/gemini-3.1-flash-lite`).
 
@@ -28,15 +28,15 @@ Add `SUMOPOD_API_KEY` under Project Settings, Environment Variables, then redepl
 | --- | --- |
 | Home | Greeting, scan shortcuts, recent scans, daily symptom check-in, best matches |
 | Scanner | Product mode (rear camera) and Skin mode (front camera), upload from gallery, flash, tap to focus |
-| Product result | Personal score, Nutri-Score, flagged ingredients, nutrition levels, diet fit, alternatives, save to favorites |
+| Product result | Personal score with a grade (Excellent, Good, Poor, Bad), avoid list warning, For your skin (effect on your skin from your last skin check), Nutri-Score, flagged ingredients, nutrition levels, diet fit, alternatives, save to favorites |
 | Skin result | Skin score with change since last check, photo quality and confidence, top priority, six-zone face map, nine concern levels, AM/PM routine with key ingredients, use as my routine |
 | Diary | Skin journal: today's check, AM/PM routine checklist, mood, sleep, water, stress, tags and notes; history timeline with photo compare; trends and patterns between diary entries and skin score; skin goals; product scan history |
 | Explore | 200+ live articles from public health RSS feeds (`/api/feed`), ranked for each person's condition, details, symptoms and skin goals, with the reason shown; plus quick guides |
-| Profile | Health profile, symptoms, language (EN, ID, AR with RTL, FR, ZH), sign out |
+| Profile | Health profile, symptoms, avoid list (sugar, dairy, gluten, palm oil, sweeteners, caffeine, fragrance, alcohol, essential oils, parabens, sulfates, silicones, retinoids, pore-clogging oils), language (EN, ID, AR with RTL, FR, ZH), sign out |
 
 ## Supabase setup (once)
 
-Open Supabase Dashboard, SQL Editor, paste `supabase/setup.sql` and run it. It creates `skin_checks`, `diary_logs`, `user_settings`, a private `skin-photos` storage bucket, adds `language` to `profiles` and `category` to `scans`, and sets Row Level Security so each person only sees their own rows.
+Open Supabase Dashboard, SQL Editor, paste `supabase/setup.sql` and run it. It creates `skin_checks`, adds `avoid` to `user_settings`, `diary_logs`, `user_settings`, a private `skin-photos` storage bucket, adds `language` to `profiles` and `category` to `scans`, and sets Row Level Security so each person only sees their own rows.
 
 Until it is run, the app still works, but the diary stays on the device (Profile shows Backup: This device only).
 

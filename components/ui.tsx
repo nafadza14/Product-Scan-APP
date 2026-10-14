@@ -51,7 +51,7 @@ export const PrimaryButton: React.FC<PressableProps> = ({ className = '', childr
 
 export const SecondaryButton: React.FC<PressableProps> = ({ className = '', children, ...rest }) => (
   <Pressable
-    className={`h-14 w-full rounded-full bg-white text-ink font-semibold text-[16px] flex items-center justify-center gap-2 shadow-soft ${className}`}
+    className={`h-14 w-full rounded-full bg-mist text-ink font-semibold text-[16px] flex items-center justify-center gap-2 ${className}`}
     {...rest}
   >
     {children}
@@ -67,7 +67,7 @@ export const IconButton: React.FC<PressableProps & { tone?: 'dark' | 'light' | '
 }) => {
   const tones = {
     dark: 'bg-ink text-white',
-    light: 'bg-white text-ink shadow-soft',
+    light: 'bg-mist text-ink',
     glass: 'bg-white/20 text-white backdrop-blur-xl border border-white/25'
   };
   return (
@@ -211,7 +211,7 @@ export function Segmented<T extends string>({
             {active && (
               <motion.span
                 layoutId={layoutId}
-                className={`absolute inset-0 rounded-full ${dark ? 'bg-white' : 'bg-white shadow-soft'}`}
+                className={`absolute inset-0 rounded-full ${dark ? 'bg-white' : 'bg-mist'}`}
                 transition={softSpring}
               />
             )}
@@ -235,7 +235,7 @@ export const Chip: React.FC<{
     onClick={onClick}
     aria-pressed={active}
     className={`h-10 px-4 rounded-full text-[14px] font-semibold whitespace-nowrap transition-colors ${
-      active ? 'bg-ink text-white' : 'bg-white text-ink shadow-soft'
+      active ? 'bg-ink text-white' : 'bg-mist text-ink'
     } ${className}`}
   >
     {children}
@@ -260,7 +260,7 @@ export const EmptyState: React.FC<{ icon: React.ReactNode; title: string; body: 
   action
 }) => (
   <div className="flex flex-col items-center text-center px-8 py-12">
-    <div className="w-16 h-16 rounded-3xl bg-white shadow-soft flex items-center justify-center text-ink-muted mb-5">{icon}</div>
+    <div className="w-16 h-16 rounded-3xl bg-mist flex items-center justify-center text-ink-muted mb-5">{icon}</div>
     <p className="text-[17px] font-semibold text-ink mb-1.5">{title}</p>
     <p className="text-[15px] text-ink-muted leading-relaxed max-w-[280px]">{body}</p>
     {action && <div className="mt-6 w-full max-w-[260px]">{action}</div>}

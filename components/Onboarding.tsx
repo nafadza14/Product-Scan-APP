@@ -139,7 +139,7 @@ const Onboarding: React.FC<Props> = ({ t, rtl, mode, language, initial, defaultN
                 <h1 className="text-[30px] leading-[1.12] font-semibold tracking-[-0.02em] text-ink">{t('ob1Title')}</h1>
                 <p className="text-[16px] text-ink-muted mt-2 mb-6">{t('ob1Sub')}</p>
 
-                <label className="block rounded-3xl bg-white shadow-soft px-4 py-3 mb-4">
+                <label className="block rounded-3xl bg-mist px-4 py-3 mb-4">
                   <span className="block text-[12px] text-ink-muted mb-1">{t('yourName')}</span>
                   <input
                     value={name}
@@ -163,7 +163,7 @@ const Onboarding: React.FC<Props> = ({ t, rtl, mode, language, initial, defaultN
                           if (id !== condition) setContext([]);
                         }}
                         className={`relative rounded-3xl p-4 text-start min-h-[132px] flex flex-col justify-between transition-colors ${
-                          active ? 'bg-ink text-white shadow-lift' : 'bg-white text-ink shadow-soft'
+                          active ? 'bg-ink text-white shadow-lift' : 'bg-mist text-ink'
                         }`}
                       >
                         <span className={`w-10 h-10 rounded-2xl flex items-center justify-center ${active ? 'bg-white/15' : 'bg-sage-soft'}`}>
@@ -196,7 +196,7 @@ const Onboarding: React.FC<Props> = ({ t, rtl, mode, language, initial, defaultN
               <>
                 <h1 className="text-[30px] leading-[1.12] font-semibold tracking-[-0.02em] text-ink">{t('ob2Title')}</h1>
                 {condition === HealthCondition.MORE_DISEASES ? (
-                  <div className="mt-6 rounded-3xl bg-white shadow-soft divide-y divide-canvas">
+                  <div className="mt-6 rounded-3xl bg-mist divide-y divide-canvas">
                     <label className="block px-4 py-3">
                       <span className="block text-[12px] text-ink-muted mb-1">{t('conditionName')}</span>
                       <input
@@ -220,7 +220,7 @@ const Onboarding: React.FC<Props> = ({ t, rtl, mode, language, initial, defaultN
                 ) : (
                   <>
                     <p className="text-[16px] text-ink-muted mt-2 mb-6">{t('ob2Sub')}</p>
-                    <div className="rounded-3xl bg-white shadow-soft divide-y divide-canvas overflow-hidden">
+                    <div className="rounded-3xl bg-mist divide-y divide-canvas overflow-hidden">
                       {contextOptions(condition).map((o) => {
                         const on = context.includes(o);
                         return (
@@ -262,7 +262,7 @@ const Onboarding: React.FC<Props> = ({ t, rtl, mode, language, initial, defaultN
                         haptics={false}
                         aria-pressed={on}
                         onClick={() => toggle(symptoms, setSymptoms, s)}
-                        className={`h-11 px-4 rounded-full text-[15px] font-semibold transition-colors ${on ? 'bg-ink text-white' : 'bg-white text-ink shadow-soft'}`}
+                        className={`h-11 px-4 rounded-full text-[15px] font-semibold transition-colors ${on ? 'bg-ink text-white' : 'bg-mist text-ink'}`}
                       >
                         {optionLabel(s, language)}
                       </Pressable>

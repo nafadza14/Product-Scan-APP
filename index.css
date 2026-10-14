@@ -10,7 +10,7 @@
 
 html, body {
   margin: 0;
-  background: #CFD9D6;
+  background: #EEF2F1;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
@@ -42,7 +42,7 @@ button { -webkit-user-select: none; user-select: none; }
 .pb-safe { padding-bottom: max(var(--safe-bottom), 14px); }
 
 .blur-bar {
-  background: rgba(233, 238, 236, 0.78);
+  background: rgba(255, 255, 255, 0.82);
   backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
 }
@@ -58,7 +58,7 @@ button { -webkit-user-select: none; user-select: none; }
   100% { background-position: 200% 0; }
 }
 .skeleton {
-  background: linear-gradient(90deg, #DCE6E4 25%, #EEF3F2 50%, #DCE6E4 75%);
+  background: linear-gradient(90deg, #EEF2F1 25%, #F8FAF9 50%, #EEF2F1 75%);
   background-size: 200% 100%;
   animation: shimmer 1.4s ease-in-out infinite;
 }

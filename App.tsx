@@ -36,7 +36,10 @@ import {
   scoreOf
 } from './services/diaryService';
 import DiaryView from './components/diary/DiaryView';
-import { CompareView, GoalsSheet, RoutineEditor } from './components/diary/DiarySheets';
+import { AvoidSheet, CompareView, GoalsSheet, RoutineEditor } from './components/diary/DiarySheets';
+import { CONCERN_KEYS } from './components/diary/shared';
+
+const SKIN_TYPE_KEYS = { Dry: 'skinDry', Normal: 'skinNormal', Combination: 'skinCombination', Oily: 'skinOily' } as const;
 import { NavBar } from './components/ui';
 import HomeView from './components/HomeView';
 import { ExploreView, ArticlePage, FeedArticlePage } from './components/ExploreView';
@@ -62,6 +65,7 @@ type Overlay =
   | { k: 'onboarding'; mode: OnboardingMode }
   | { k: 'routineEdit' }
   | { k: 'goals' }
+  | { k: 'avoid' }
   | { k: 'compare'; a: string; b: string }
   | { k: 'products' };
 
@@ -212,6 +216,7 @@ const App: React.FC = () => {
         const remoteSettingsNewer = cloud.settings && cloud.settings.updatedAt >= (localRoutine?.updatedAt || 0);
         const routineFinal = remoteSettingsNewer ? cloud.settings!.routine : localRoutine;
         const goalsFinal = remoteSettingsNewer && cloud.settings!.goals ? cloud.settings!.goals : localPrefs.goals;
+        const avoidFinal = remoteSettingsNewer && cloud.settings!.avoid ? cloud.settings!.avoid : localPrefs.avoid || cloud.settings?.avoid || [];
         const favs = new Set([...(cloud.settings?.favorites || []), ...getFavoriteIds(id)]);
 
         setSkinHistory(scans);
@@ -220,8 +225,8 @@ const App: React.FC = () => {
         saveLogs(id, logsMerged);
         setRoutine(routineFinal);
         if (routineFinal) saveRoutine(id, routineFinal);
-        setPrefs({ goals: goalsFinal });
-        savePrefs(id, { goals: goalsFinal });
+        setPrefs({ goals: goalsFinal, avoid: avoidFinal });
+        savePrefs(id, { goals: goalsFinal, avoid: avoidFinal });
         setFavoriteIds(id, favs);
         setHistory(remoteHistory.map((h) => ({ ...h, isFavorite: favs.has(h.id) })));
 
@@ -234,7 +239,7 @@ const App: React.FC = () => {
           const r = cloud.logs[d];
           if (!r || (l.updatedAt || 0) > (r.updatedAt || 0)) pushLog(id, l);
         }
-        if (!cloud.settings || !remoteSettingsNewer) pushSettings(id, { routine: routineFinal, goals: goalsFinal, favorites: Array.from(favs) });
+        if (!cloud.settings || !remoteSettingsNewer) pushSettings(id, { routine: routineFinal, goals: goalsFinal, avoid: avoidFinal, favorites: Array.from(favs) });
       } else {
         setHistory(remoteHistory);
       }
@@ -321,7 +326,7 @@ const App: React.FC = () => {
       const favs = next.filter((h) => h.isFavorite).map((h) => h.id);
       setFavoriteIds(userId, new Set(favs));
       cacheHistory(userId, next);
-      pushSettings(userId, { routine, goals: prefs.goals, favorites: favs });
+      pushSettings(userId, { routine, goals: prefs.goals, avoid: prefs.avoid, favorites: favs });
       return next;
     });
   };
@@ -339,7 +344,18 @@ const App: React.FC = () => {
       if (!user || !userId) throw new Error('No profile');
       const svc = await import('./services/aiService');
       if (mode === 'product') {
-        const result = await svc.analyzeImage(base64, user);
+        const last = [...skinHistory].sort((a, b) => b.timestamp - a.timestamp)[0];
+        const result = await svc.analyzeImage(base64, user, {
+          skin: last
+            ? {
+                skinType: last.skinType,
+                concerns: (last.concernDetails || []).filter((c) => c.severity >= 2).map((c) => c.id as string).concat(last.concernDetails ? [] : last.concerns).slice(0, 5),
+                daysAgo: Math.max(0, Math.round((Date.now() - last.timestamp) / 86400000))
+              }
+            : undefined,
+          goals: prefs.goals,
+          avoid: prefs.avoid
+        });
         const item: ScanHistoryItem = { ...result, id: crypto.randomUUID(), timestamp: Date.now(), isFavorite: false };
         setHistory((prev) => {
           const next = [item, ...prev];
@@ -396,7 +412,7 @@ const App: React.FC = () => {
     if (!userId) return;
     setRoutine(r);
     saveRoutine(userId, r);
-    pushSettings(userId, { routine: r, goals: prefs.goals, favorites: history.filter((h) => h.isFavorite).map((h) => h.id) });
+    pushSettings(userId, { routine: r, goals: prefs.goals, avoid: prefs.avoid, favorites: history.filter((h) => h.isFavorite).map((h) => h.id) });
   };
 
   const applyScanRoutine = (scan?: SkinScanItem) => {
@@ -427,6 +443,15 @@ const App: React.FC = () => {
         ? { x: rtl ? '28%' : '-28%', scale: 1, y: 0, borderRadius: 0, filter: 'brightness(0.94)' }
         : { x: '0%', scale: 1, y: 0, borderRadius: 0, filter: 'brightness(1)' };
 
+  // "Oily, Breakouts, Redness" from the latest skin check, shown under the skin match on product results.
+  const latestSkin = skinHistory.length ? [...skinHistory].sort((a, b) => b.timestamp - a.timestamp)[0] : undefined;
+  const latestSkinInfo = latestSkin
+    ? [
+        t(SKIN_TYPE_KEYS[latestSkin.skinType]),
+        ...(latestSkin.concernDetails || []).filter((c) => c.severity >= 2).slice(0, 2).map((c) => t(CONCERN_KEYS[c.id]))
+      ].join(', ')
+    : undefined;
+
   const renderOverlay = (o: Overlay, i: number) => {
     const key = `${o.k}-${i}`;
     switch (o.k) {
@@ -445,6 +470,9 @@ const App: React.FC = () => {
               onClose={close}
               onToggleFavorite={toggleFavorite}
               onScanAnother={() => replaceTop({ k: 'scanner', mode: 'product' })}
+              skinInfo={latestSkinInfo}
+              onCheckSkin={() => replaceTop({ k: 'scanner', mode: 'skin' })}
+              onEditAvoid={() => open({ k: 'avoid' })}
             />
           </Sheet>
         );
@@ -495,7 +523,25 @@ const App: React.FC = () => {
                 setPrefs(p);
                 if (userId) {
                   savePrefs(userId, p);
-                  pushSettings(userId, { routine, goals, favorites: history.filter((h) => h.isFavorite).map((h) => h.id) });
+                  pushSettings(userId, { routine, goals, avoid: prefs.avoid, favorites: history.filter((h) => h.isFavorite).map((h) => h.id) });
+                }
+                close();
+              }}
+            />
+          </Sheet>
+        );
+      case 'avoid':
+        return (
+          <Sheet key={key} onClose={close} height="auto" label={t('avoidTitle')}>
+            <AvoidSheet
+              t={t}
+              initial={prefs.avoid || []}
+              onSave={(avoid) => {
+                const p = { ...prefs, avoid };
+                setPrefs(p);
+                if (userId) {
+                  savePrefs(userId, p);
+                  pushSettings(userId, { routine, goals: prefs.goals, avoid, favorites: history.filter((h) => h.isFavorite).map((h) => h.id) });
                 }
                 close();
               }}
@@ -598,25 +644,17 @@ const App: React.FC = () => {
 
   if (booting) {
     return (
-      <div className="w-full max-w-[450px] h-[100dvh] bg-canvas flex items-center justify-center">
-        <motion.svg viewBox="0 0 512 512" className="w-16 h-16" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
-          <rect width="512" height="512" rx="112" fill="#0E2B2E" />
-          <circle cx="256" cy="256" r="132" fill="none" stroke="#2B4A4D" strokeWidth="36" />
-          <motion.circle
-            cx="256"
-            cy="256"
-            r="132"
-            fill="none"
-            stroke="#EE5F3B"
-            strokeWidth="36"
-            strokeLinecap="round"
-            initial={{ pathLength: 0.15, rotate: 0 }}
-            animate={{ pathLength: [0.15, 0.6, 0.15], rotate: 360 }}
-            transition={{ duration: 1.4, repeat: Infinity, ease: 'linear' }}
-            style={{ originX: '50%', originY: '50%' }}
+      <div key="splash" className="w-full max-w-[450px] h-[100dvh] bg-canvas flex items-center justify-center">
+        <motion.div className="flex flex-col items-center gap-3" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
+          <motion.img
+            src="/icon.svg"
+            alt=""
+            className="w-20 h-20 rounded-[24px] shadow-lift"
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
           />
-          <circle cx="256" cy="256" r="34" fill="#E9EEEC" />
-        </motion.svg>
+          <span className="text-[17px] font-semibold tracking-[-0.01em] text-ink">Scanything</span>
+        </motion.div>
       </div>
     );
   }
@@ -628,7 +666,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="relative w-full max-w-[450px] h-[100dvh] overflow-hidden bg-black">
+    <div key="app" className="relative w-full max-w-[450px] h-[100dvh] overflow-hidden bg-black">
       <motion.div
         className="absolute inset-0 bg-canvas overflow-hidden origin-top"
         animate={baseAnim}
@@ -695,6 +733,8 @@ const App: React.FC = () => {
                 onEditProfile={() => open({ k: 'onboarding', mode: 'edit' })}
                 onUpdateSymptoms={() => open({ k: 'onboarding', mode: 'symptoms' })}
                 onLanguage={() => open({ k: 'language' })}
+                avoidCount={(prefs.avoid || []).length}
+                onAvoid={() => open({ k: 'avoid' })}
                 onSignOut={signOut}
               />
             )}

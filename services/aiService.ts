@@ -11,8 +11,11 @@ import {
   SkinZoneId,
   SkinConcern,
   ConcernId,
-  Severity
+  Severity,
+  SkinImpact,
+  AvoidKey
 } from '../types';
+import { avoidLabel, detectAvoid, isAvoidKey } from './avoidService';
 
 // JSON Schema type names (the schemas below are sent to the model inside the prompt).
 const Type = { OBJECT: 'object', STRING: 'string', NUMBER: 'number', BOOLEAN: 'boolean', ARRAY: 'array' } as const;
@@ -120,13 +123,36 @@ ${JSON.stringify(schema)}`;
 const stripDashes = (s: string) => s.replace(/\s*[\u2014\u2013]\s*/g, ', ');
 const clean = (s: unknown, fallback = '') => (typeof s === 'string' && s.trim() ? stripDashes(s.trim()) : fallback);
 
-export const analyzeImage = async (imageBase64: string, userProfile: UserProfile): Promise<ScanResult> => {
+export interface ProductContext {
+  /** Latest skin check, so the result can say how this product affects this person's skin. */
+  skin?: { skinType: string; concerns: string[]; daysAgo: number };
+  goals?: SkinGoal[];
+  avoid?: AvoidKey[];
+}
+
+export const analyzeImage = async (imageBase64: string, userProfile: UserProfile, ctx: ProductContext = {}): Promise<ScanResult> => {
   const language = LANGUAGE_NAMES[userProfile.language] || 'English';
+  const avoid = (ctx.avoid || []).filter(isAvoidKey);
+  const skinLine = ctx.skin
+    ? `Latest skin check (${ctx.skin.daysAgo} days ago): ${ctx.skin.skinType} skin; visible concerns: ${ctx.skin.concerns.join(', ') || 'none marked'}.`
+    : 'No skin check yet. Judge skin impact from the health profile only and keep it general.';
+  const goalLine = ctx.goals?.length ? `Skin goals: ${ctx.goals.map((g) => GOAL_TEXT[g]).join(', ')}.` : '';
+  const avoidLine = avoid.length
+    ? `Avoid list (the person asked to be warned about these): ${avoid.map((k) => `${k} = ${avoidLabel(k)}`).join('; ')}.`
+    : 'Avoid list: empty.';
 
   const systemInstruction = `
 You are a careful food and cosmetics ingredient analyst.
 Analyze the product in the photo for this person:
 ${profileSummary(userProfile)}
+${skinLine}
+${goalLine}
+${avoidLine}
+
+Food and skin are linked. For every product, also explain how it is likely to affect THIS person's skin:
+- Food: glycemic load and added sugar (linked to breakouts), dairy and whey (linked to acne in some people), omega-3, antioxidants, vitamins A, C, E, zinc, water content; alcohol and very salty food (puffiness, dryness).
+- Cosmetics: fit with the skin type and concerns above (comedogenic oils for breakout-prone skin, fragrance and essential oils for redness or sensitivity, drying alcohol for dry skin, helpful actives for the goals).
+- Be honest about evidence: say "may" or "for some people" where evidence is mixed. Never promise a cure.
 
 First decide if the photo shows a packaged food, drink, supplement or cosmetic with readable text.
 If it does not, set "recognized" to false and leave the other fields minimal.
@@ -136,6 +162,7 @@ SCORING (0 to 100, how well this product suits THIS person):
 - Never give more than 60 to a D or E product.
 - Pregnancy: weigh high sugar heavily (gestational diabetes risk), flag retinoids, high-dose vitamin A, salicylic acid in high concentrations, alcohol, raw or unpasteurized ingredients, high-mercury fish.
 - Allergies: any listed allergen, or "may contain" warnings for it, means AVOID.
+- Avoid list: if the product contains an item from the avoid list, put its key in "avoidHits", flag the ingredient, and lower the score by at least 20.
 - Status: SAFE for 70 and above, CAUTION for 40 to 69, AVOID below 40.
 - Cosmetics have no Nutri-Score, nutrition or diet fields.
 
@@ -144,6 +171,7 @@ OUTPUT:
 - "explanation": two or three sentences on why this score fits this person.
 - "icon": a single emoji that represents the product.
 - Ingredients: list up to 10 that matter most, flagged ones first.
+- "skinImpact": level is good, neutral or bad for this person's skin; "summary" is one sentence; "points" are 2 or 3 short reasons, each under 14 words.
 - "nutritionAdvisor" names must be exactly one of: Fat, Saturated Fat, Sugar, Salt, Protein. Levels must be Low, Medium or High.
 ${STYLE_RULES}`;
 
@@ -199,9 +227,19 @@ ${STYLE_RULES}`;
           properties: { name: { type: Type.STRING }, reason: { type: Type.STRING } },
           required: ['name', 'reason']
         }
-      }
+      },
+      skinImpact: {
+        type: Type.OBJECT,
+        properties: {
+          level: { type: Type.STRING, enum: ['good', 'neutral', 'bad'] },
+          summary: { type: Type.STRING },
+          points: { type: Type.ARRAY, items: { type: Type.STRING } }
+        },
+        required: ['level', 'summary']
+      },
+      avoidHits: { type: Type.ARRAY, items: { type: Type.STRING } }
     },
-    required: ['recognized', 'productName', 'category', 'status', 'score', 'explanation', 'ingredients', 'alternatives']
+    required: ['recognized', 'productName', 'category', 'status', 'score', 'explanation', 'ingredients', 'alternatives', 'skinImpact']
   };
 
   const data = await callModel(
@@ -213,8 +251,23 @@ ${STYLE_RULES}`;
 
   if (data.recognized === false || !data.productName) throw new AnalysisError('not_recognized');
 
-  const score = clamp(data.score);
-  const status: ScanStatus =
+  const category = data.category === 'Cosmetic' || data.category === 'Other' ? data.category : 'Food';
+  const fullIngredientList = clean(data.fullIngredientList);
+  const modelHits = (Array.isArray(data.avoidHits) ? data.avoidHits : []).filter((k: unknown) => isAvoidKey(k) && avoid.includes(k as AvoidKey));
+  const avoidHits = Array.from(new Set<AvoidKey>([...modelHits, ...detectAvoid(fullIngredientList, avoid, category)]));
+  let score = clamp(data.score);
+  // The model may miss its own rule; an avoid-list hit always costs points.
+  if (avoidHits.length && score > 49) score = Math.min(score - 20, 49);
+  const si = data.skinImpact;
+  const skinImpact: SkinImpact | undefined =
+    si && typeof si.summary === 'string' && si.summary.trim()
+      ? {
+          level: si.level === 'good' || si.level === 'bad' ? si.level : 'neutral',
+          summary: clean(si.summary),
+          points: (Array.isArray(si.points) ? si.points : []).filter((p: unknown) => typeof p === 'string' && p.trim()).slice(0, 3).map((p: string) => clean(p))
+        }
+      : undefined;
+  const status: ScanStatus = avoidHits.length && data.status === 'SAFE' ? ScanStatus.CAUTION :
     data.status === 'SAFE' || data.status === 'CAUTION' || data.status === 'AVOID'
       ? data.status
       : score >= 70
@@ -222,7 +275,6 @@ ${STYLE_RULES}`;
         : score >= 40
           ? ScanStatus.CAUTION
           : ScanStatus.AVOID;
-  const category = data.category === 'Cosmetic' || data.category === 'Other' ? data.category : 'Food';
 
   return {
     productName: clean(data.productName, 'Unknown product'),
@@ -232,7 +284,7 @@ ${STYLE_RULES}`;
     score,
     nutriScore: category === 'Food' && ['A', 'B', 'C', 'D', 'E'].includes(data.nutriScore) ? data.nutriScore : undefined,
     explanation: clean(data.explanation),
-    fullIngredientList: clean(data.fullIngredientList),
+    fullIngredientList,
     ingredients: (Array.isArray(data.ingredients) ? data.ingredients : []).slice(0, 10).map((i: any) => ({
       name: clean(i?.name, '?'),
       riskLevel: i?.riskLevel === 'High Risk' || i?.riskLevel === 'Moderate' ? i.riskLevel : 'Safe',
@@ -243,7 +295,9 @@ ${STYLE_RULES}`;
     alternatives: (Array.isArray(data.alternatives) ? data.alternatives : []).slice(0, 3).map((a: any) => ({
       name: clean(a?.name),
       reason: clean(a?.reason)
-    }))
+    })),
+    skinImpact,
+    avoidHits
   };
 };
 

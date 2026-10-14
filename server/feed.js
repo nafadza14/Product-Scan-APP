@@ -203,7 +203,7 @@ const fetchFeed = async (feed) => {
   try {
     const res = await fetch(feed.url, {
       signal: ctrl.signal,
-      headers: { 'User-Agent': 'VitalSense/1.0 (+https://product-scan-app.vercel.app)', Accept: 'application/rss+xml, application/xml, text/xml, */*' }
+      headers: { 'User-Agent': 'Scanything/1.0 (+https://product-scan-app.vercel.app)', Accept: 'application/rss+xml, application/xml, text/xml, */*' }
     });
     if (!res.ok) return [];
     return parseFeed(await res.text(), feed);

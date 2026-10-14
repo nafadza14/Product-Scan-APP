@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, Plus, Sparkles, Trash2 } from 'lucide-react';
-import { RoutineItem, SkinGoal, SkinScanItem, UserRoutine } from '../../types';
+import { AvoidKey, RoutineItem, SkinGoal, SkinScanItem, UserRoutine } from '../../types';
+import { AVOID_ITEMS } from '../../services/avoidService';
 import { Translator, TranslationKey } from '../../i18n';
 import { newRoutineItem, scoreOf } from '../../services/diaryService';
 import { NavBar, Pressable, PrimaryButton, Ring, Segmented } from '../ui';
@@ -53,7 +54,7 @@ export const RoutineEditor: React.FC<{
           </Pressable>
         )}
 
-        <ol className="rounded-3xl bg-white shadow-soft divide-y divide-canvas overflow-hidden mb-4">
+        <ol className="rounded-3xl bg-mist divide-y divide-canvas overflow-hidden mb-4">
           {r[time].map((it, i) => (
             <li key={it.id} className="flex items-center gap-3 px-3 py-2.5">
               <span className="w-7 h-7 rounded-full bg-sage-soft text-ink text-[13px] font-semibold flex items-center justify-center shrink-0">{i + 1}</span>
@@ -85,7 +86,7 @@ export const RoutineEditor: React.FC<{
             e.preventDefault();
             add();
           }}
-          className="rounded-3xl bg-white shadow-soft p-3 space-y-2"
+          className="rounded-3xl bg-mist p-3 space-y-2"
         >
           <input
             id="new-step"
@@ -123,7 +124,7 @@ export const GoalsSheet: React.FC<{ t: Translator; initial: SkinGoal[]; onSave: 
     <div className="px-5 pt-9 pb-safe">
       <h2 className="text-[22px] font-semibold text-ink">{t('goalsTitle')}</h2>
       <p className="text-[15px] text-ink-muted mt-1 mb-4">{t('goalsSub')}</p>
-      <div className="rounded-3xl bg-white shadow-soft divide-y divide-canvas overflow-hidden mb-4">
+      <div className="rounded-3xl bg-mist divide-y divide-canvas overflow-hidden mb-4">
         {GOALS.map((g) => {
           const on = goals.includes(g.id);
           return (
@@ -183,7 +184,7 @@ export const CompareView: React.FC<{
           {col(a, 'compareBefore')}
           {col(b, 'compareAfter')}
         </div>
-        <div className="rounded-3xl bg-white shadow-soft divide-y divide-canvas">
+        <div className="rounded-3xl bg-mist divide-y divide-canvas">
           {rows.map(([k, x, y]) => {
             const d = y - x;
             return (
@@ -205,6 +206,48 @@ export const CompareView: React.FC<{
           })}
         </div>
         <p className="text-[13px] text-ink-faint leading-relaxed mt-4">{t('skinDisclaimer')}</p>
+      </div>
+    </div>
+  );
+};
+
+// ---------- Avoid list ----------
+
+export const AvoidSheet: React.FC<{ t: Translator; initial: AvoidKey[]; onSave: (a: AvoidKey[]) => void }> = ({ t, initial, onSave }) => {
+  const [sel, setSel] = useState<AvoidKey[]>(initial);
+  const group = (g: 'food' | 'skin', title: TranslationKey) => (
+    <div className="mb-5">
+      <p className="text-[13px] font-semibold uppercase tracking-[0.06em] text-ink-muted mb-2.5">{t(title)}</p>
+      <div className="flex flex-wrap gap-2">
+        {AVOID_ITEMS.filter((i) => i.group === g).map((i) => {
+          const on = sel.includes(i.key);
+          return (
+            <Pressable
+              key={i.key}
+              role="checkbox"
+              aria-checked={on}
+              haptics={false}
+              data-testid={`avoid-${i.key}`}
+              onClick={() => setSel((prev) => (on ? prev.filter((x) => x !== i.key) : [...prev, i.key]))}
+              className={`h-10 px-3.5 rounded-full text-[14px] font-semibold inline-flex items-center gap-1.5 transition-colors ${
+                on ? 'bg-ink text-white' : 'bg-mist text-ink'
+              }`}
+            >
+              {on && <Check size={14} strokeWidth={3} />} {t(`av_${i.key}` as TranslationKey)}
+            </Pressable>
+          );
+        })}
+      </div>
+    </div>
+  );
+  return (
+    <div className="px-5 pt-9 pb-safe">
+      <h2 className="text-[22px] font-semibold text-ink">{t('avoidTitle')}</h2>
+      <p className="text-[15px] text-ink-muted mt-1 mb-5">{t('avoidSub')}</p>
+      {group('food', 'avoidFood')}
+      {group('skin', 'avoidSkin')}
+      <div className="pb-2">
+        <PrimaryButton onClick={() => onSave(sel)}>{t('saveChanges')}</PrimaryButton>
       </div>
     </div>
   );

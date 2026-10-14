@@ -69,7 +69,7 @@ const HomeView: React.FC<Props> = ({
       </motion.header>
 
       {!hasApiKey && (
-        <motion.div variants={rise} className="mb-4 rounded-3xl bg-white p-4 shadow-soft flex gap-3 items-start">
+        <motion.div variants={rise} className="mb-4 rounded-3xl bg-mist p-4 flex gap-3 items-start">
           <div className="w-10 h-10 rounded-2xl bg-coral/10 text-coral flex items-center justify-center shrink-0">
             <KeyRound size={20} />
           </div>
@@ -119,7 +119,7 @@ const HomeView: React.FC<Props> = ({
 
         <Pressable
           onClick={() => onScan('skin')}
-          className="w-full h-[64px] rounded-full bg-white text-ink flex items-center gap-4 ps-2 pe-6 shadow-soft"
+          className="w-full h-[64px] rounded-full bg-mist text-ink flex items-center gap-4 ps-2 pe-6"
         >
           <span className="w-[48px] h-[48px] rounded-full bg-coral/10 text-coral flex items-center justify-center">
             <Smile size={22} />
@@ -155,7 +155,7 @@ const HomeView: React.FC<Props> = ({
                 <Pressable
                   key={r.item.id}
                   onClick={() => onOpenProduct(r.item)}
-                  className="snap-start shrink-0 w-[156px] rounded-3xl bg-white p-3 text-start shadow-soft"
+                  className="snap-start shrink-0 w-[156px] rounded-3xl bg-mist p-3 text-start"
                 >
                   <div className="h-[112px] rounded-2xl bg-sage-soft flex items-center justify-center text-[52px] mb-3 relative">
                     <ProductIcon icon={r.item.icon} size={80} className="bg-transparent" />
@@ -172,7 +172,7 @@ const HomeView: React.FC<Props> = ({
                 <Pressable
                   key={r.item.id}
                   onClick={() => onOpenSkin(r.item)}
-                  className="snap-start shrink-0 w-[156px] rounded-3xl bg-white p-3 text-start shadow-soft"
+                  className="snap-start shrink-0 w-[156px] rounded-3xl bg-mist p-3 text-start"
                 >
                   <div className="h-[112px] rounded-2xl bg-coral/10 flex items-center justify-center mb-3 relative overflow-hidden">
                     {r.item.photoId ? (
@@ -198,7 +198,7 @@ const HomeView: React.FC<Props> = ({
       {/* Daily check-in */}
       {user && (
         <motion.section variants={rise} className="mb-8">
-          <Pressable onClick={onFeeling} className="w-full rounded-3xl bg-white p-4 flex items-center gap-4 text-start shadow-soft">
+          <Pressable onClick={onFeeling} className="w-full rounded-3xl bg-mist p-4 flex items-center gap-4 text-start">
             <span className="w-12 h-12 rounded-2xl bg-sage-soft text-ink flex items-center justify-center shrink-0">
               <HeartPulse size={22} />
             </span>
@@ -215,7 +215,7 @@ const HomeView: React.FC<Props> = ({
       {topPicks.length > 0 && (
         <motion.section variants={rise}>
           <h3 className="text-[20px] font-semibold text-ink tracking-[-0.01em] mb-3">{t('topPicks')}</h3>
-          <div className="rounded-3xl bg-white shadow-soft divide-y divide-canvas">
+          <div className="rounded-3xl bg-mist divide-y divide-canvas">
             {topPicks.map((item) => (
               <Pressable key={item.id} onClick={() => onOpenProduct(item)} className="w-full flex items-center gap-3 p-3 text-start">
                 <ProductIcon icon={item.icon} size={48} />

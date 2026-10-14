@@ -63,7 +63,21 @@ export interface ScanResult {
   nutritionAdvisor?: MacroNutrient[];
   dietarySuitability?: DietarySuitability;
   alternatives: Array<{ name: string; reason: string }>;
+  /** How this product is likely to affect the person's skin, based on their latest skin check. */
+  skinImpact?: SkinImpact;
+  /** Keys from the person's avoid list found in this product. */
+  avoidHits?: AvoidKey[];
 }
+
+export interface SkinImpact {
+  level: 'good' | 'neutral' | 'bad';
+  summary: string;
+  points: string[];
+}
+
+export type AvoidKey =
+  | 'addedSugar' | 'dairy' | 'gluten' | 'palmOil' | 'sweeteners' | 'caffeine'
+  | 'fragrance' | 'alcohol' | 'essentialOils' | 'parabens' | 'sulfates' | 'silicones' | 'retinoids' | 'comedogenic';
 
 export interface ScanHistoryItem extends ScanResult {
   id: string;
@@ -180,6 +194,7 @@ export type SkinGoal = 'clearBreakouts' | 'evenTone' | 'hydration' | 'calmRednes
 
 export interface DiaryPrefs {
   goals: SkinGoal[];
+  avoid?: AvoidKey[];
 }
 
 export interface Article {

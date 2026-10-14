@@ -1,13 +1,15 @@
 {
-  "short_name": "VitalSense",
-  "name": "VitalSense: label and skin scanner",
+  "short_name": "Scanything",
+  "name": "Scanything: food and skin scanner",
+  "description": "Scan food and skincare labels and see how they suit your body and your skin.",
   "icons": [
     { "src": "/icon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
     { "src": "/icon-192.png", "type": "image/png", "sizes": "192x192" },
-    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512" }
+    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512" },
+    { "src": "/icon-maskable-512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
   ],
   "start_url": "/",
   "display": "standalone",
-  "theme_color": "#E9EEEC",
-  "background_color": "#E9EEEC"
+  "theme_color": "#FFFFFF",
+  "background_color": "#FFFFFF"
 }

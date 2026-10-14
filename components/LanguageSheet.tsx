@@ -8,7 +8,7 @@ import { Pressable } from './ui';
 const LanguageSheet: React.FC<{ t: Translator; current: AppLanguage; onPick: (l: AppLanguage) => void }> = ({ t, current, onPick }) => (
   <div className="px-5 pt-9 pb-safe">
     <h2 className="text-[22px] font-semibold text-ink mb-4">{t('language')}</h2>
-    <div className="rounded-3xl bg-white shadow-soft divide-y divide-canvas overflow-hidden mb-4" role="radiogroup">
+    <div className="rounded-3xl bg-mist divide-y divide-canvas overflow-hidden mb-4" role="radiogroup">
       {languageOptions.map((o) => {
         const on = o.code === current;
         return (

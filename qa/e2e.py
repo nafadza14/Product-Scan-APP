@@ -1,5 +1,5 @@
 """
-End-to-end QA for VitalSense.
+End-to-end QA for Scanything.
 
 Runs the built app (vite preview on :4173) in headless Chromium with:
   - a fake camera that shows a product label (qa/assets/label.png)
@@ -82,6 +82,12 @@ PRODUCT = {
         {"name": "Plain rolled oats with berries", "reason": "Same fiber, no added sugar. Sweeten with fruit."},
         {"name": "Unsweetened muesli", "reason": "Crunchy texture with far less sugar per serving."},
     ],
+    "skinImpact": {
+        "level": "bad",
+        "summary": "High added sugar can make breakouts worse for some people with combination skin.",
+        "points": ["Sugar and glucose syrup raise the glycemic load", "Almonds add a little vitamin E"],
+    },
+    "avoidHits": ["addedSugar"],
 }
 
 SKIN = {
@@ -536,6 +542,36 @@ def main():
             page.wait_for_timeout(600)
             expect(page.get_by_text("2 of 4 done")).to_be_visible()
         check("Goals and routine editor save", diary_goals_and_routine_edit)
+
+        def avoid_list_and_skin_match():
+            page.get_by_role("button", name="Profile").click()
+            page.wait_for_timeout(500)
+            page.get_by_role("button", name=re.compile("Avoid list")).click()
+            page.get_by_role("checkbox", name="Added sugar").click()
+            page.get_by_role("checkbox", name="Fragrance").click()
+            shot(page, "22b-avoid-list")
+            page.get_by_role("button", name="Save changes").click()
+            page.wait_for_timeout(1400)
+            expect(page.get_by_text("2 items")).to_be_visible()
+            assert state["cloud_settings"] and state["cloud_settings"].get("avoid") == ["addedSugar", "fragrance"], state["cloud_settings"]
+            page.get_by_role("button", name="Home").click()
+            page.wait_for_timeout(500)
+            page.get_by_text("Scan a product").click()
+            expect(page.get_by_role("button", name="Take photo")).to_be_enabled(timeout=6000)
+            page.wait_for_timeout(400)
+            page.get_by_role("button", name="Take photo").click()
+            sheet = page.get_by_role("dialog", name="Honey Oat Granola")
+            expect(sheet.get_by_test_id("avoid-hit")).to_contain_text("Added sugar", timeout=8000)
+            expect(sheet.get_by_test_id("avoid-hit")).not_to_contain_text("Fragrance")
+            expect(sheet.get_by_test_id("grade")).to_have_text("Poor")
+            match = sheet.get_by_test_id("skin-match")
+            expect(match).to_contain_text("May work against your skin")
+            expect(match).to_contain_text("Based on your last skin check: Combination")
+            page.wait_for_timeout(900)
+            shot(page, "22c-result-skin-match")
+            page.get_by_role("button", name="Close").first.click()
+            page.wait_for_timeout(700)
+        check("Avoid list and skin match personalize product results", avoid_list_and_skin_match)
 
         def diary_history_trends_compare():
             # Seed two weeks of history so trends and patterns have data.

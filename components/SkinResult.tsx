@@ -136,7 +136,7 @@ const SkinResult: React.FC<Props> = ({ t, rtl, item, previous, routineSaved, onC
           )}
 
           {/* Skin type */}
-          <motion.section {...reveal(1)} className="rounded-3xl bg-white p-5 shadow-soft mb-3">
+          <motion.section {...reveal(1)} className="rounded-3xl bg-mist p-5 mb-3">
             <p className="text-[16px] text-ink-soft mb-3">
               {t('skinType')}: <span className="font-semibold text-ink">{t(typeKey[item.skinType])}</span>
             </p>
@@ -149,7 +149,7 @@ const SkinResult: React.FC<Props> = ({ t, rtl, item, previous, routineSaved, onC
             </div>
             <div className="relative h-2.5 rounded-full bg-gradient-to-r from-[#F9C98A] via-[#F6A04D] to-coral" dir="ltr">
               <motion.span
-                className="absolute top-1/2 -mt-[11px] w-[22px] h-[22px] -ml-[11px] rounded-full bg-white border-[5px] border-coral shadow-soft"
+                className="absolute top-1/2 -mt-[11px] w-[22px] h-[22px] -ml-[11px] rounded-full bg-mist border-[5px] border-coral"
                 initial={{ left: '0%' }}
                 animate={{ left: `${(typeIndex / (TYPES.length - 1)) * 100}%` }}
                 transition={{ delay: 0.5, type: 'spring', stiffness: 200, damping: 22 }}
@@ -184,7 +184,7 @@ const SkinResult: React.FC<Props> = ({ t, rtl, item, previous, routineSaved, onC
           {item.zones && item.zones.length > 0 && (
             <motion.section {...reveal(3)} className="mb-8">
               <h3 className="text-[19px] font-semibold text-ink mb-3">{t('zonesTitle')}</h3>
-              <div className="rounded-3xl bg-white shadow-soft p-4">
+              <div className="rounded-3xl bg-mist p-4">
                 <div className="flex gap-4 items-start">
                   <div className="w-[120px] shrink-0">
                     <FaceMap scores={zoneScores} active={zone} onPick={(z) => setZone((cur) => (cur === z ? null : z))} />
@@ -216,7 +216,7 @@ const SkinResult: React.FC<Props> = ({ t, rtl, item, previous, routineSaved, onC
           {concerns.length > 0 && (
             <motion.section {...reveal(3)} className="mb-8">
               <h3 className="text-[19px] font-semibold text-ink mb-3">{t('concernLevels')}</h3>
-              <ul className="rounded-3xl bg-white shadow-soft divide-y divide-canvas">
+              <ul className="rounded-3xl bg-mist divide-y divide-canvas">
                 {concerns.map((c, i) => (
                   <li key={c.id} className="p-4">
                     <div className="flex items-center justify-between gap-3 mb-2">
@@ -261,7 +261,7 @@ const SkinResult: React.FC<Props> = ({ t, rtl, item, previous, routineSaved, onC
                 steps.length ? (
                   <div key={time} className="mb-3">
                     {time !== 'all' && <p className="text-[14px] font-semibold text-ink-muted mb-2 px-1">{time === 'am' ? `☀️ ${t('routineAm')}` : `🌙 ${t('routinePm')}`}</p>}
-                    <ol className="rounded-3xl bg-white shadow-soft divide-y divide-canvas">
+                    <ol className="rounded-3xl bg-mist divide-y divide-canvas">
                       {steps.map((r, i) => (
                         <li key={i} className="flex gap-3.5 p-4">
                           <span className="w-8 h-8 rounded-full bg-sage-soft text-ink text-[14px] font-semibold flex items-center justify-center shrink-0">{i + 1}</span>
@@ -281,7 +281,7 @@ const SkinResult: React.FC<Props> = ({ t, rtl, item, previous, routineSaved, onC
 
           {(item.lookFor.length > 0 || item.avoid.length > 0) && (
             <motion.section {...reveal(5)} className="grid grid-cols-2 gap-3 mb-8">
-              <div className="rounded-3xl bg-white shadow-soft p-4">
+              <div className="rounded-3xl bg-mist p-4">
                 <p className="text-[15px] font-semibold text-safe mb-2">{t('lookFor')}</p>
                 <ul className="space-y-1.5">
                   {item.lookFor.map((x) => (
@@ -289,7 +289,7 @@ const SkinResult: React.FC<Props> = ({ t, rtl, item, previous, routineSaved, onC
                   ))}
                 </ul>
               </div>
-              <div className="rounded-3xl bg-white shadow-soft p-4">
+              <div className="rounded-3xl bg-mist p-4">
                 <p className="text-[15px] font-semibold text-avoid mb-2">{t('avoidIngredients')}</p>
                 <ul className="space-y-1.5">
                   {item.avoid.map((x) => (
@@ -311,7 +311,7 @@ const SkinResult: React.FC<Props> = ({ t, rtl, item, previous, routineSaved, onC
 
       <div className="absolute bottom-0 inset-x-0 px-5 pt-3 pb-safe blur-bar">
         <div className="flex gap-3 mb-1">
-          <Pressable onClick={onCheckAgain} aria-label={t('checkAgain')} className="h-14 w-14 shrink-0 rounded-full bg-white text-ink flex items-center justify-center shadow-soft">
+          <Pressable onClick={onCheckAgain} aria-label={t('checkAgain')} className="h-14 w-14 shrink-0 rounded-full bg-mist text-ink flex items-center justify-center">
             <RefreshCw size={20} />
           </Pressable>
           {onUseRoutine && item.routine.length > 0 ? (

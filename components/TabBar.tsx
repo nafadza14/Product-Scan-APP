@@ -28,7 +28,7 @@ const TabBar: React.FC<{ t: Translator; tab: Tab; onTab: (t: Tab) => void; onSca
         aria-current={active ? 'page' : undefined}
         className="relative w-12 h-12 flex items-center justify-center"
       >
-        {active && <motion.span layoutId="tab-bubble" className="absolute inset-0 rounded-full bg-white shadow-soft" transition={softSpring} />}
+        {active && <motion.span layoutId="tab-bubble" className="absolute inset-0 rounded-full bg-mist" transition={softSpring} />}
         <Icon size={22} strokeWidth={active ? 2.2 : 1.8} className={`relative z-10 transition-colors ${active ? 'text-ink' : 'text-ink-muted'}`} />
       </button>
     );

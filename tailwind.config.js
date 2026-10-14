@@ -4,7 +4,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        canvas: '#E9EEEC',
+        canvas: '#FFFFFF',
+        mist: '#F2F5F4',
+        leaf: { DEFAULT: '#17473A', light: '#9AD46B' },
+        peach: '#F47B45',
         sage: { DEFAULT: '#C3D3D1', soft: '#DCE6E4', deep: '#9DB5B2' },
         ink: { DEFAULT: '#0E2B2E', soft: '#3F5A5C', muted: '#6E8283', faint: '#A7B6B6' },
         coral: { DEFAULT: '#EE5F3B', light: '#F6A04D' },

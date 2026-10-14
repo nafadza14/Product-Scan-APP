@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Star, ScanLine, AlertTriangle, ChevronDown, Leaf, Wheat, Milk, Sprout, Sparkles } from 'lucide-react';
+import { Star, ScanLine, AlertTriangle, ChevronDown, Leaf, Wheat, Milk, Sprout, Sparkles, Ban, ThumbsUp, Minus, ThumbsDown, Camera } from 'lucide-react';
 import { MacroNutrient, ScanHistoryItem, ScanStatus, UserProfile } from '../types';
 import { Translator, TranslationKey, conditionLabel } from '../i18n';
 import { NavBar, Pressable, ProductIcon, Ring, useCountUp } from './ui';
@@ -14,7 +14,26 @@ interface Props {
   onClose: () => void;
   onToggleFavorite: (id: string) => void;
   onScanAnother: () => void;
+  /** Localized summary of the latest skin check, e.g. "Oily, Breakouts". Absent when there is none. */
+  skinInfo?: string;
+  onCheckSkin?: () => void;
+  onEditAvoid?: () => void;
 }
+
+export const gradeOf = (score: number): { key: TranslationKey; color: string } =>
+  score >= 75
+    ? { key: 'gradeExcellent', color: '#2E8C68' }
+    : score >= 50
+      ? { key: 'gradeGood', color: '#6BA644' }
+      : score >= 25
+        ? { key: 'gradePoor', color: '#E9733A' }
+        : { key: 'gradeBad', color: '#D2432F' };
+
+const IMPACT = {
+  good: { key: 'impactGood' as TranslationKey, color: '#2E8C68', bg: 'rgba(46,140,104,0.10)', Icon: ThumbsUp },
+  neutral: { key: 'impactNeutral' as TranslationKey, color: '#6E8283', bg: 'rgba(110,130,131,0.12)', Icon: Minus },
+  bad: { key: 'impactBad' as TranslationKey, color: '#D2432F', bg: 'rgba(210,67,47,0.10)', Icon: ThumbsDown }
+};
 
 const NUTRI_COLORS: Record<string, string> = { A: '#1E8F4E', B: '#7AC943', C: '#F2C230', D: '#F08A24', E: '#D9412F' };
 
@@ -55,7 +74,10 @@ const MacroRow: React.FC<{ m: MacroNutrient; t: Translator }> = ({ m, t }) => {
   );
 };
 
-const ProductResult: React.FC<Props> = ({ t, rtl, item, user, onClose, onToggleFavorite, onScanAnother }) => {
+const ProductResult: React.FC<Props> = ({ t, rtl, item, user, onClose, onToggleFavorite, onScanAnother, skinInfo, onCheckSkin, onEditAvoid }) => {
+  const grade = gradeOf(item.score);
+  const avoidHits = item.avoidHits || [];
+  const impact = item.skinImpact ? IMPACT[item.skinImpact.level] : null;
   const [scrolled, setScrolled] = useState(false);
   const [showFull, setShowFull] = useState(false);
   const score = useCountUp(item.score, 0.35);
@@ -74,6 +96,9 @@ const ProductResult: React.FC<Props> = ({ t, rtl, item, user, onClose, onToggleF
     <div key="score" className="rounded-3xl bg-white p-4 flex flex-col justify-between min-h-[132px]">
       <span className="text-[14px] font-medium text-ink-soft flex items-center gap-1.5">
         <Sparkles size={15} style={{ color }} /> {t('yourScore')}
+      </span>
+      <span className="text-[13px] font-semibold mt-1" style={{ color: grade.color }} data-testid="grade">
+        {t(grade.key)}
       </span>
       <div className="flex items-end justify-between mt-3">
         <span className="text-[34px] leading-none font-semibold tracking-[-0.02em] text-ink tabular-nums">{score}</span>
@@ -144,7 +169,7 @@ const ProductResult: React.FC<Props> = ({ t, rtl, item, user, onClose, onToggleF
 
         <div className="px-5 pb-40">
           <motion.div {...reveal(0)} className="flex items-center gap-4 mb-6">
-            <ProductIcon icon={item.icon} size={72} className="!rounded-3xl bg-white shadow-soft" />
+            <ProductIcon icon={item.icon} size={72} className="!rounded-3xl bg-mist" />
             <div className="min-w-0">
               <p className="text-[14px] text-ink-muted">{isCosmetic ? t('filterSkincare') : t('filterFood')}</p>
               <h1 className="text-[22px] leading-tight font-semibold text-ink tracking-[-0.01em] line-clamp-2">{item.productName}</h1>
@@ -158,6 +183,25 @@ const ProductResult: React.FC<Props> = ({ t, rtl, item, user, onClose, onToggleF
             {verdict.sub}. {t('scoreFor', { condition: conditionLabel(t, user) })}
           </motion.p>
 
+          {avoidHits.length > 0 && (
+            <motion.div {...reveal(1)} className="rounded-3xl bg-avoid/10 p-4 mb-5 flex gap-3" role="alert" data-testid="avoid-hit">
+              <span className="w-9 h-9 rounded-2xl bg-avoid text-white flex items-center justify-center shrink-0">
+                <Ban size={18} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold text-avoid">{t('avoidHitTitle')}</span>
+                <span className="block text-[14px] text-ink-soft leading-snug mt-0.5">
+                  {t('avoidHitBody', { items: avoidHits.map((k) => t(`av_${k}` as TranslationKey)).join(', ') })}
+                </span>
+                {onEditAvoid && (
+                  <Pressable haptics={false} onClick={onEditAvoid} className="mt-1.5 text-[13px] font-semibold text-ink underline underline-offset-2">
+                    {t('avoidEdit')}
+                  </Pressable>
+                )}
+              </span>
+            </motion.div>
+          )}
+
           <motion.div {...reveal(2)} className="rounded-[30px] bg-sage-soft p-2 grid grid-cols-2 gap-2 mb-8">
             {tiles.map((tile, i) => (
               <div key={i} className={tiles.length % 2 === 1 && i === tiles.length - 1 ? 'col-span-2' : ''}>
@@ -165,6 +209,42 @@ const ProductResult: React.FC<Props> = ({ t, rtl, item, user, onClose, onToggleF
               </div>
             ))}
           </motion.div>
+
+          <motion.section {...reveal(3)} className="mb-8" data-testid="skin-match">
+            <h3 className="text-[19px] font-semibold text-ink mb-3">{t('skinMatchTitle')}</h3>
+            <div className="rounded-3xl bg-mist p-4">
+              {impact && item.skinImpact ? (
+                <>
+                  <span className="inline-flex items-center gap-2 h-8 px-3 rounded-full text-[13.5px] font-semibold" style={{ color: impact.color, background: impact.bg }}>
+                    <impact.Icon size={15} /> {t(impact.key)}
+                  </span>
+                  <p className="text-[16px] leading-relaxed text-ink mt-3">{item.skinImpact.summary}</p>
+                  {item.skinImpact.points.length > 0 && (
+                    <ul className="mt-2 space-y-1.5">
+                      {item.skinImpact.points.map((p, i) => (
+                        <li key={i} className="flex gap-2 text-[14.5px] leading-snug text-ink-soft">
+                          <span className="mt-[7px] w-1.5 h-1.5 rounded-full shrink-0" style={{ background: impact.color }} />
+                          {p}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              ) : null}
+              {skinInfo ? (
+                <p className="text-[13px] text-ink-muted mt-3">{t('skinMatchBasedOn', { info: skinInfo })}</p>
+              ) : (
+                <div className={`flex items-center gap-3 ${impact ? 'mt-4 pt-4 border-t border-white' : ''}`}>
+                  <p className="flex-1 text-[14px] leading-snug text-ink-soft">{t('skinMatchNoCheck')}</p>
+                  {onCheckSkin && (
+                    <Pressable onClick={onCheckSkin} className="h-10 px-4 rounded-full bg-ink text-white text-[14px] font-semibold inline-flex items-center gap-1.5 shrink-0">
+                      <Camera size={16} /> {t('skinMatchCta')}
+                    </Pressable>
+                  )}
+                </div>
+              )}
+            </div>
+          </motion.section>
 
           {item.explanation && (
             <motion.section {...reveal(3)} className="mb-8">
@@ -176,9 +256,9 @@ const ProductResult: React.FC<Props> = ({ t, rtl, item, user, onClose, onToggleF
           <motion.section {...reveal(4)} className="mb-8">
             <h3 className="text-[19px] font-semibold text-ink mb-3">{t('flagged')}</h3>
             {flagged.length === 0 ? (
-              <p className="text-[15px] text-ink-muted rounded-3xl bg-white p-4 shadow-soft">{t('flaggedNone')}</p>
+              <p className="text-[15px] text-ink-muted rounded-3xl bg-mist p-4">{t('flaggedNone')}</p>
             ) : (
-              <div className="rounded-3xl bg-white shadow-soft divide-y divide-canvas">
+              <div className="rounded-3xl bg-mist divide-y divide-canvas">
                 {flagged.map((ing, i) => {
                   const high = ing.riskLevel === 'High Risk';
                   return (
@@ -204,7 +284,7 @@ const ProductResult: React.FC<Props> = ({ t, rtl, item, user, onClose, onToggleF
           {!isCosmetic && item.nutritionAdvisor && item.nutritionAdvisor.length > 0 && (
             <motion.section {...reveal(5)} className="mb-8">
               <h3 className="text-[19px] font-semibold text-ink mb-3">{t('nutrition')}</h3>
-              <div className="rounded-3xl bg-white shadow-soft px-4 divide-y divide-canvas">
+              <div className="rounded-3xl bg-mist px-4 divide-y divide-canvas">
                 {item.nutritionAdvisor.map((m, i) => (
                   <MacroRow key={i} m={m} t={t} />
                 ))}
@@ -229,7 +309,7 @@ const ProductResult: React.FC<Props> = ({ t, rtl, item, user, onClose, onToggleF
                     <span
                       key={k}
                       className={`inline-flex items-center gap-2 h-10 px-3.5 rounded-full text-[14px] font-semibold ${
-                        yes ? 'bg-ink text-white' : 'bg-white text-ink-faint shadow-soft line-through decoration-1'
+                        yes ? 'bg-ink text-white' : 'bg-mist text-ink-faint line-through decoration-1'
                       }`}
                       aria-label={`${t(k)}: ${yes ? t('likely') : t('unlikely')}`}
                     >
@@ -246,7 +326,7 @@ const ProductResult: React.FC<Props> = ({ t, rtl, item, user, onClose, onToggleF
               haptics={false}
               onClick={() => setShowFull((s) => !s)}
               aria-expanded={showFull}
-              className="w-full rounded-3xl bg-white shadow-soft p-4 text-start"
+              className="w-full rounded-3xl bg-mist p-4 text-start"
             >
               <span className="flex items-center justify-between">
                 <span className="text-[16px] font-semibold text-ink">{t('fullList')}</span>
@@ -275,7 +355,7 @@ const ProductResult: React.FC<Props> = ({ t, rtl, item, user, onClose, onToggleF
               <h3 className="text-[19px] font-semibold text-ink mb-3">{t('alternatives')}</h3>
               <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-5 px-5 snap-x snap-mandatory pb-1">
                 {item.alternatives.map((alt, i) => (
-                  <div key={i} className="snap-start shrink-0 w-[230px] rounded-3xl bg-white p-4 shadow-soft">
+                  <div key={i} className="snap-start shrink-0 w-[230px] rounded-3xl bg-mist p-4">
                     <span className="w-9 h-9 rounded-2xl bg-safe/10 text-safe flex items-center justify-center mb-3">
                       <Leaf size={18} />
                     </span>
@@ -298,7 +378,7 @@ const ProductResult: React.FC<Props> = ({ t, rtl, item, user, onClose, onToggleF
             onClick={() => onToggleFavorite(item.id)}
             aria-pressed={!!item.isFavorite}
             className={`h-14 px-5 rounded-full font-semibold flex items-center gap-2 transition-colors ${
-              item.isFavorite ? 'bg-coral text-white' : 'bg-white text-ink shadow-soft'
+              item.isFavorite ? 'bg-coral text-white' : 'bg-mist text-ink'
             }`}
           >
             <motion.span key={String(item.isFavorite)} initial={{ scale: 0.4, rotate: -30 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 500, damping: 15 }}>

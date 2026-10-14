@@ -109,13 +109,7 @@ const Auth: React.FC<Props> = ({ t, rtl, initialMode, onClose }) => {
     <div className="flex-1 overflow-y-auto no-scrollbar">
       <NavBar onClose={onClose} backLabel={t('back')} closeLabel={t('close')} rtl={rtl} />
       <div className="px-5 pb-10">
-        <div className="w-16 h-16 rounded-[22px] bg-ink flex items-center justify-center mb-6 shadow-lift" aria-hidden>
-          <svg viewBox="0 0 512 512" className="w-10 h-10">
-            <circle cx="256" cy="256" r="150" fill="none" stroke="#2B4A4D" strokeWidth="44" />
-            <path d="M256 106a150 150 0 0 1 142 102" fill="none" stroke="#EE5F3B" strokeWidth="44" strokeLinecap="round" />
-            <circle cx="256" cy="256" r="40" fill="#E9EEEC" />
-          </svg>
-        </div>
+        <img src="/icon.svg" alt="" aria-hidden className="w-16 h-16 rounded-[22px] mb-6 shadow-lift" />
 
         <AnimatePresence mode="wait">
           <motion.div key={mode} initial={{ opacity: 0, x: rtl ? -12 : 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: rtl ? 12 : -12 }} transition={{ duration: 0.22 }}>
@@ -154,7 +148,7 @@ const Auth: React.FC<Props> = ({ t, rtl, initialMode, onClose }) => {
         </AnimatePresence>
 
         <form onSubmit={submit}>
-          <div className="rounded-3xl bg-white shadow-soft divide-y divide-canvas mb-5 overflow-hidden">
+          <div className="rounded-3xl bg-mist divide-y divide-canvas mb-5 overflow-hidden">
             <AnimatePresence initial={false}>
               {isSignUp && (
                 <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">

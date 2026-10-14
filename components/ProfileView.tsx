@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight, Cloud, Globe, HeartPulse, LogOut, Pencil, ScanLine, UserRound } from 'lucide-react';
+import { Ban, ChevronRight, Cloud, Globe, HeartPulse, LogOut, Pencil, ScanLine, UserRound } from 'lucide-react';
 import { AppLanguage, UserProfile } from '../types';
 import { Translator, conditionLabel, languageOptions, optionLabel } from '../i18n';
 import { Avatar, Pressable, PrimaryButton, SecondaryButton } from './ui';
@@ -17,6 +17,8 @@ interface Props {
   onEditProfile: () => void;
   onUpdateSymptoms: () => void;
   onLanguage: () => void;
+  avoidCount?: number;
+  onAvoid?: () => void;
   onSignOut: () => void;
 }
 
@@ -45,7 +47,7 @@ const Row: React.FC<{
   );
 };
 
-const ProfileView: React.FC<Props> = ({ t, rtl, user, language, email, stats, hasApiKey, cloudStatus = 'unknown', onSignIn, onEditProfile, onUpdateSymptoms, onLanguage, onSignOut }) => {
+const ProfileView: React.FC<Props> = ({ t, rtl, user, language, email, stats, hasApiKey, cloudStatus = 'unknown', onSignIn, onEditProfile, onUpdateSymptoms, onLanguage, avoidCount = 0, onAvoid, onSignOut }) => {
   const langName = languageOptions.find((l) => l.code === language)?.native;
 
   if (!user) {
@@ -63,7 +65,7 @@ const ProfileView: React.FC<Props> = ({ t, rtl, user, language, email, stats, ha
             <SecondaryButton onClick={() => onSignIn('signin')}>{t('signIn')}</SecondaryButton>
           </div>
         </div>
-        <div className="rounded-3xl bg-white shadow-soft overflow-hidden">
+        <div className="rounded-3xl bg-mist overflow-hidden">
           <Row icon={<Globe size={18} />} label={t('language')} value={langName} onClick={onLanguage} rtl={rtl} />
         </div>
       </div>
@@ -93,7 +95,7 @@ const ProfileView: React.FC<Props> = ({ t, rtl, user, language, email, stats, ha
             [stats.skin, t('statSkin')]
           ] as const
         ).map(([n, label]) => (
-          <div key={label} className="rounded-3xl bg-white p-4 shadow-soft">
+          <div key={label} className="rounded-3xl bg-mist p-4">
             <p className="text-[26px] leading-none font-semibold text-ink tabular-nums">{n}</p>
             <p className="text-[13px] text-ink-muted mt-1.5">{label}</p>
           </div>
@@ -101,7 +103,7 @@ const ProfileView: React.FC<Props> = ({ t, rtl, user, language, email, stats, ha
       </div>
 
       <h2 className="text-[15px] font-semibold text-ink-muted px-1 mb-2">{t('healthProfile')}</h2>
-      <div className="rounded-3xl bg-white shadow-soft mb-6 overflow-hidden">
+      <div className="rounded-3xl bg-mist mb-6 overflow-hidden">
         <div className="px-4 pt-4 pb-3 border-b border-canvas">
           <p className="text-[13px] text-ink-muted">{t('focus')}</p>
           <p className="text-[19px] font-semibold text-ink mt-0.5">{conditionLabel(t, user)}</p>
@@ -120,11 +122,14 @@ const ProfileView: React.FC<Props> = ({ t, rtl, user, language, email, stats, ha
         <div className="divide-y divide-canvas">
           <Row icon={<HeartPulse size={18} />} label={t('updateSymptoms')} onClick={onUpdateSymptoms} rtl={rtl} />
           <Row icon={<Pencil size={18} />} label={t('editProfile')} onClick={onEditProfile} rtl={rtl} />
+          {onAvoid && (
+            <Row icon={<Ban size={18} />} label={t('avoidRow')} value={avoidCount ? t('avoidCount', { n: avoidCount }) : t('avoidNone')} onClick={onAvoid} rtl={rtl} />
+          )}
         </div>
       </div>
 
       <h2 className="text-[15px] font-semibold text-ink-muted px-1 mb-2">{t('settings')}</h2>
-      <div className="rounded-3xl bg-white shadow-soft divide-y divide-canvas mb-6 overflow-hidden">
+      <div className="rounded-3xl bg-mist divide-y divide-canvas mb-6 overflow-hidden">
         <Row icon={<Globe size={18} />} label={t('language')} value={langName} onClick={onLanguage} rtl={rtl} />
         <Row icon={<ScanLine size={18} />} label={t('scanning')} value={hasApiKey ? t('scanningReady') : t('scanningOff')} />
         <Row
@@ -134,7 +139,7 @@ const ProfileView: React.FC<Props> = ({ t, rtl, user, language, email, stats, ha
         />
       </div>
 
-      <div className="rounded-3xl bg-white shadow-soft overflow-hidden">
+      <div className="rounded-3xl bg-mist overflow-hidden">
         <Row icon={<LogOut size={18} />} label={t('signOut')} onClick={onSignOut} danger />
       </div>
     </div>

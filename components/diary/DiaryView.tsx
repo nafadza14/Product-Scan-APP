@@ -39,7 +39,7 @@ const FEELINGS: { v: 1 | 2 | 3 | 4 | 5; emoji: string; key: TranslationKey }[] =
   { v: 5, emoji: '😊', key: 'feel5' }
 ];
 
-const card = 'rounded-[26px] bg-white shadow-soft';
+const card = 'rounded-[26px] bg-mist';
 
 const Stepper: React.FC<{ label: string; value?: number; unit: (n: number) => string; step: number; max: number; onChange: (n: number) => void; lessLabel: string; moreLabel: string }> = ({
   label,
@@ -54,11 +54,11 @@ const Stepper: React.FC<{ label: string; value?: number; unit: (n: number) => st
   <div className="flex-1 min-w-0 rounded-2xl bg-sage-soft/70 p-3">
     <p className="text-[13px] text-ink-muted mb-1.5">{label}</p>
     <div className="flex items-center justify-between gap-1">
-      <Pressable aria-label={`${lessLabel} ${label}`} onClick={() => onChange(Math.max(0, (value ?? 0) - step))} className="w-8 h-8 rounded-full bg-white text-ink flex items-center justify-center shadow-soft">
+      <Pressable aria-label={`${lessLabel} ${label}`} onClick={() => onChange(Math.max(0, (value ?? 0) - step))} className="w-8 h-8 rounded-full bg-mist text-ink flex items-center justify-center">
         <Minus size={15} />
       </Pressable>
       <span className={`text-[16px] font-semibold tabular-nums ${value === undefined ? 'text-ink-faint' : 'text-ink'}`}>{value === undefined ? '-' : unit(value)}</span>
-      <Pressable aria-label={`${moreLabel} ${label}`} onClick={() => onChange(Math.min(max, (value ?? 0) + step))} className="w-8 h-8 rounded-full bg-white text-ink flex items-center justify-center shadow-soft">
+      <Pressable aria-label={`${moreLabel} ${label}`} onClick={() => onChange(Math.min(max, (value ?? 0) + step))} className="w-8 h-8 rounded-full bg-mist text-ink flex items-center justify-center">
         <Plus size={15} />
       </Pressable>
     </div>
@@ -563,7 +563,7 @@ const DiaryView: React.FC<Props> = (p) => {
       <div className="pt-3 flex items-start justify-between gap-3 mb-1">
         <h1 className="text-[32px] leading-none font-semibold tracking-[-0.02em] text-ink">{t('diaryTitle')}</h1>
         <span
-          className={`shrink-0 h-9 px-3 rounded-full inline-flex items-center gap-1.5 text-[13.5px] font-semibold ${days > 0 ? 'bg-coral/10 text-coral' : 'bg-white text-ink-muted shadow-soft'}`}
+          className={`shrink-0 h-9 px-3 rounded-full inline-flex items-center gap-1.5 text-[13.5px] font-semibold ${days > 0 ? 'bg-coral/10 text-coral' : 'bg-mist text-ink-muted'}`}
         >
           <Flame size={16} /> {days > 0 ? t('streakDays', { n: days }) : t('streakStart')}
         </span>

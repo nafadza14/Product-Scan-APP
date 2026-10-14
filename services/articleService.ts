@@ -44,7 +44,7 @@ const SOURCES: Source[] = [
       content: [
         'Nutri-Score grades a food from A (dark green) to E (red) based on its nutrients per 100 g. Sugar, salt, saturated fat and calories pull the grade down. Fiber, protein, fruit, vegetables and nuts pull it up.',
         'It works best for comparing similar products, like two breakfast cereals. Comparing a cereal to an olive oil with it is less useful.',
-        'It does not know about you. A B-graded product can still contain an ingredient you need to avoid. That is why VitalSense shows a personal score next to the Nutri-Score.'
+        'It does not know about you. A B-graded product can still contain an ingredient you need to avoid. That is why Scanything shows a personal score next to the Nutri-Score.'
       ]
     },
     idn: {
@@ -53,7 +53,7 @@ const SOURCES: Source[] = [
       content: [
         'Nutri-Score menilai makanan dari A (hijau tua) sampai E (merah) berdasarkan nutrisi per 100 g. Gula, garam, lemak jenuh dan kalori menurunkan nilai. Serat, protein, buah, sayur dan kacang menaikkannya.',
         'Paling berguna untuk membandingkan produk sejenis, misalnya dua sereal sarapan. Kurang berguna untuk membandingkan sereal dengan minyak zaitun.',
-        'Nutri-Score tidak mengenal kondisimu. Produk bernilai B tetap bisa mengandung bahan yang perlu kamu hindari. Karena itu VitalSense menampilkan skor personal di samping Nutri-Score.'
+        'Nutri-Score tidak mengenal kondisimu. Produk bernilai B tetap bisa mengandung bahan yang perlu kamu hindari. Karena itu Scanything menampilkan skor personal di samping Nutri-Score.'
       ]
     }
   },
@@ -203,7 +203,7 @@ const SOURCES: Source[] = [
       content: [
         'Note what you ate, what you put on your skin and how you felt, once a day. A few words is enough.',
         'Patterns usually show up after two or three weeks. Look for symptoms that follow the same food or product more than once.',
-        'Updating your symptoms in VitalSense helps too: when you feel off, results weigh irritating ingredients more heavily.',
+        'Updating your symptoms in Scanything helps too: when you feel off, results weigh irritating ingredients more heavily.',
         'Share the log with your doctor. Real notes make appointments faster and more useful.'
       ]
     },
@@ -213,7 +213,7 @@ const SOURCES: Source[] = [
       content: [
         'Catat apa yang kamu makan, apa yang kamu pakai di kulit dan bagaimana rasanya, sekali sehari. Beberapa kata sudah cukup.',
         'Pola biasanya terlihat setelah dua atau tiga minggu. Perhatikan gejala yang muncul setelah makanan atau produk yang sama lebih dari sekali.',
-        'Memperbarui gejala di VitalSense juga membantu: saat kamu kurang sehat, hasil akan lebih ketat menilai bahan yang bisa memicu iritasi.',
+        'Memperbarui gejala di Scanything juga membantu: saat kamu kurang sehat, hasil akan lebih ketat menilai bahan yang bisa memicu iritasi.',
         'Bagikan catatanmu ke dokter. Catatan nyata membuat konsultasi lebih cepat dan berguna.'
       ]
     }

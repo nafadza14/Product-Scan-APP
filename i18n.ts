@@ -1,5 +1,6 @@
 import { AppLanguage, HealthCondition } from './types';
 import { diaryEn, diaryId, diaryFr, diaryAr, diaryZh } from './i18n-diary';
+import { matchEn, matchId, matchFr, matchAr, matchZh } from './i18n-match';
 
 const baseEn = {
   cancel: 'Cancel',
@@ -233,7 +234,7 @@ const baseEn = {
   condOtherSub: 'Tell us what to watch for'
 };
 
-const en = { ...baseEn, ...diaryEn };
+const en = { ...baseEn, ...diaryEn, ...matchEn };
 export type TranslationKey = keyof typeof en;
 type Dict = Record<TranslationKey, string>;
 type BaseDict = Record<keyof typeof baseEn, string>;
@@ -1122,10 +1123,10 @@ const zhBase: BaseDict = {
   condOtherSub: '告诉我们需要留意什么'
 };
 
-const id: Dict = { ...idBase, ...diaryId };
-const fr: Dict = { ...frBase, ...diaryFr };
-const ar: Dict = { ...arBase, ...diaryAr };
-const zh: Dict = { ...zhBase, ...diaryZh };
+const id: Dict = { ...idBase, ...diaryId, ...matchId };
+const fr: Dict = { ...frBase, ...diaryFr, ...matchFr };
+const ar: Dict = { ...arBase, ...diaryAr, ...matchAr };
+const zh: Dict = { ...zhBase, ...diaryZh, ...matchZh };
 
 const dictionaries: Record<AppLanguage, Dict> = {
   [AppLanguage.EN]: en,

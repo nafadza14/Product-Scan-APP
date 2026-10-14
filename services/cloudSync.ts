@@ -36,14 +36,14 @@ const handleError = (e: any) => {
 export interface CloudSnapshot {
   scans: SkinScanItem[];
   logs: Record<string, DiaryLog>;
-  settings: { routine: UserRoutine | null; goals: DiaryPrefs['goals'] | null; favorites: string[] | null; updatedAt: number } | null;
+  settings: { routine: UserRoutine | null; goals: DiaryPrefs['goals'] | null; avoid: DiaryPrefs['avoid'] | null; favorites: string[] | null; updatedAt: number } | null;
 }
 
 export const pullAll = async (userId: string): Promise<CloudSnapshot | null> => {
   const [checks, logs, settings] = await Promise.all([
     supabase.from('skin_checks').select('id, taken_at, data, photo_path').eq('user_id', userId).order('taken_at', { ascending: false }).limit(500),
     supabase.from('diary_logs').select('day, data, updated_at').eq('user_id', userId).limit(1000),
-    supabase.from('user_settings').select('routine, goals, favorites, updated_at').eq('user_id', userId).maybeSingle()
+    supabase.from('user_settings').select('*').eq('user_id', userId).maybeSingle()
   ]);
   const err = checks.error || logs.error || settings.error;
   if (err) {
@@ -58,6 +58,7 @@ export const pullAll = async (userId: string): Promise<CloudSnapshot | null> => 
       ? {
           routine: settings.data.routine || null,
           goals: settings.data.goals || null,
+          avoid: settings.data.avoid || null,
           favorites: settings.data.favorites || null,
           updatedAt: Number(settings.data.updated_at) || 0
         }
@@ -104,11 +105,16 @@ export const pushLog = (userId: string, log: DiaryLog) => {
 };
 
 let settingsTimer: number | undefined;
-export const pushSettings = (userId: string, s: { routine: UserRoutine | null; goals: DiaryPrefs['goals']; favorites: string[] }) => {
+export const pushSettings = (userId: string, s: { routine: UserRoutine | null; goals: DiaryPrefs['goals']; avoid?: DiaryPrefs['avoid']; favorites: string[] }) => {
   if (status === 'not_set_up') return;
   window.clearTimeout(settingsTimer);
   settingsTimer = window.setTimeout(async () => {
-    const { error } = await supabase.from('user_settings').upsert({ user_id: userId, ...s, updated_at: Date.now() });
+    let { error } = await supabase.from('user_settings').upsert({ user_id: userId, ...s, updated_at: Date.now() });
+    // Older databases have no "avoid" column until setup.sql is run again; keep the rest in sync.
+    if (error && (error.code === 'PGRST204' || /avoid/.test(error.message || ''))) {
+      const { avoid: _skip, ...rest } = s;
+      ({ error } = await supabase.from('user_settings').upsert({ user_id: userId, ...rest, updated_at: Date.now() }));
+    }
     handleError(error);
   }, 800);
 };
