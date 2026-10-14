@@ -170,7 +170,9 @@ export const findInsights = (logs: Record<string, DiaryLog>, scans: SkinScanItem
     prev.setDate(prev.getDate() - 1);
     const l1 = logs[d];
     const l0 = logs[dateKey(prev)];
-    const tags = new Set([...(l1?.tags || []), ...(l0?.tags || [])]);
+    // Meals count too: a food trait logged that day or the day before is treated like a tag.
+    const mealFlags = [...(l1?.meals || []), ...(l0?.meals || [])].flatMap((m) => m.flags);
+    const tags = new Set([...(l1?.tags || []), ...(l0?.tags || []), ...mealFlags]);
     const sleep = l0?.sleep ?? l1?.sleep;
     const total = routine ? routine.am.length + routine.pm.length : 0;
     const done = (l0 ? l0.done.am.length + l0.done.pm.length : 0);

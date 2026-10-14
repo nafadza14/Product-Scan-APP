@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AppLanguage, Article, DiaryLog, FeedItem, DiaryPrefs, ScanHistoryItem, ScanMode, SkinScanItem, UserProfile, UserRoutine } from './types';
-import { makeT } from './i18n';
+import { AppLanguage, Article, DiaryLog, Entitlement, FeedItem, DiaryPrefs, Meal, ScanHistoryItem, ScanMode, SkinQuiz as SkinQuizData, SkinScanItem, UserProfile, UserRoutine } from './types';
+import { makeT, TranslationKey } from './i18n';
 import { supabase, requestPersistentStorage } from './services/supabaseClient';
 import { CloudStatus, getCloudStatus, mergeLogs, mergeScans, onCloudStatus, pullAll, pushLog, pushSettings, pushSkinCheck } from './services/cloudSync';
 import {
@@ -33,19 +33,31 @@ import {
   savePhoto,
   savePrefs,
   saveRoutine,
-  scoreOf
+  scoreOf,
+  newRoutineItem,
+  streak
 } from './services/diaryService';
 import DiaryView from './components/diary/DiaryView';
 import { AvoidSheet, CompareView, GoalsSheet, RoutineEditor } from './components/diary/DiarySheets';
 import { CONCERN_KEYS } from './components/diary/shared';
 
 const SKIN_TYPE_KEYS = { Dry: 'skinDry', Normal: 'skinNormal', Combination: 'skinCombination', Oily: 'skinOily' } as const;
-import { NavBar } from './components/ui';
+import { NavBar, PrimaryButton } from './components/ui';
 import HomeView from './components/HomeView';
 import { ExploreView, ArticlePage, FeedArticlePage } from './components/ExploreView';
 import LibraryView from './components/LibraryView';
 import ProfileView from './components/ProfileView';
 import TabBar, { Tab } from './components/TabBar';
+import SkinQuiz from './components/growth/SkinQuiz';
+import PlanView from './components/growth/PlanView';
+import Paywall from './components/growth/Paywall';
+import MealsCard from './components/growth/MealsCard';
+import ForYouPicks from './components/growth/ForYouPicks';
+import { FREE_SCANS_PER_DAY, PAYWALL_MODE, countScan, endTestTrial, getEntitlement, restorePurchases, scansToday, startTrial, syncEntitlement } from './services/billing';
+import { buildPlan, suggestedAvoid } from './services/planService';
+import { fileToJpeg } from './services/imageUtil';
+import { drawShareCard, shareBlob } from './services/shareCard';
+import { downloadPhoto } from './services/cloudSync';
 import Scanner from './components/Scanner';
 import ProductResult from './components/ProductResult';
 import SkinResult from './components/SkinResult';
@@ -66,11 +78,15 @@ type Overlay =
   | { k: 'routineEdit' }
   | { k: 'goals' }
   | { k: 'avoid' }
+  | { k: 'quiz' }
+  | { k: 'plan'; building?: boolean }
+  | { k: 'paywall' }
+  | { k: 'scanLimit' }
   | { k: 'compare'; a: string; b: string }
   | { k: 'products' };
 
 const presentation = (o: Overlay): 'push' | 'sheet' | 'full' =>
-  o.k === 'article' || o.k === 'feedItem' ? 'push' : o.k === 'scanner' || (o.k === 'onboarding' && o.mode === 'new') ? 'full' : 'sheet';
+  o.k === 'article' || o.k === 'feedItem' ? 'push' : o.k === 'scanner' || o.k === 'quiz' || o.k === 'paywall' || (o.k === 'onboarding' && o.mode === 'new') ? 'full' : 'sheet';
 
 const LANG_KEY = 'vitalSense_lang';
 
@@ -103,7 +119,13 @@ const App: React.FC = () => {
   const [hasApiKey, setHasApiKey] = useState(true);
   const [cloudStatus, setCloudStatus] = useState<CloudStatus>(getCloudStatus());
   useEffect(() => onCloudStatus(setCloudStatus) as unknown as () => void, []);
-  const [tab, setTab] = useState<Tab>('home');
+  const [tab, setTab] = useState<Tab>('today');
+  const [entitlement, setEntitlement] = useState<Entitlement>({ active: false, source: 'none' });
+  const [mealBusy, setMealBusy] = useState(false);
+  const [mealError, setMealError] = useState(false);
+  const [shareStatus, setShareStatus] = useState<string | undefined>();
+  const [planMeta, setPlanMeta] = useState<{ addedAvoid: DiaryPrefs['avoid']; routineApplied: boolean }>({ addedAvoid: [], routineApplied: false });
+  const pendingPlanRef = useRef(false);
   const [overlays, setOverlays] = useState<Overlay[]>([]);
 
   const overlaysRef = useRef(overlays);
@@ -170,6 +192,8 @@ const App: React.FC = () => {
   const loadUser = useCallback(
     async (id: string, mail?: string, nameFromMeta?: string) => {
       setUserId(id);
+      setEntitlement(getEntitlement(id));
+      syncEntitlement(id).then((e) => userIdRef.current === id && setEntitlement(e));
       setEmail(mail);
       setMetaName(nameFromMeta || '');
       // 1. Show what this device already has, instantly.
@@ -225,8 +249,10 @@ const App: React.FC = () => {
         saveLogs(id, logsMerged);
         setRoutine(routineFinal);
         if (routineFinal) saveRoutine(id, routineFinal);
-        setPrefs({ goals: goalsFinal, avoid: avoidFinal });
-        savePrefs(id, { goals: goalsFinal, avoid: avoidFinal });
+        const quizFinal = localPrefs.quiz && (!cloud.settings?.quiz || localPrefs.quiz.completedAt >= cloud.settings.quiz.completedAt) ? localPrefs.quiz : cloud.settings?.quiz || undefined;
+        const planFinal = localPrefs.plan && (!cloud.settings?.plan || localPrefs.plan.createdAt >= cloud.settings.plan.createdAt) ? localPrefs.plan : cloud.settings?.plan || undefined;
+        setPrefs({ goals: goalsFinal, avoid: avoidFinal, quiz: quizFinal, plan: planFinal });
+        savePrefs(id, { goals: goalsFinal, avoid: avoidFinal, quiz: quizFinal, plan: planFinal });
         setFavoriteIds(id, favs);
         setHistory(remoteHistory.map((h) => ({ ...h, isFavorite: favs.has(h.id) })));
 
@@ -239,7 +265,7 @@ const App: React.FC = () => {
           const r = cloud.logs[d];
           if (!r || (l.updatedAt || 0) > (r.updatedAt || 0)) pushLog(id, l);
         }
-        if (!cloud.settings || !remoteSettingsNewer) pushSettings(id, { routine: routineFinal, goals: goalsFinal, avoid: avoidFinal, favorites: Array.from(favs) });
+        if (!cloud.settings || !remoteSettingsNewer) pushSettings(id, { routine: routineFinal, goals: goalsFinal, avoid: avoidFinal, quiz: quizFinal, plan: planFinal, favorites: Array.from(favs) });
       } else {
         setHistory(remoteHistory);
       }
@@ -281,7 +307,7 @@ const App: React.FC = () => {
         // Close the sign-in sheet first, then load (which may open onboarding).
         closeAll();
         setTimeout(() => loadUser(session.user.id, session.user.email, nameOf(session.user)), 50);
-        setTab('home');
+        setTab('today');
         finishBoot();
       } else if (event === 'SIGNED_OUT') {
         userIdRef.current = null;
@@ -326,7 +352,7 @@ const App: React.FC = () => {
       const favs = next.filter((h) => h.isFavorite).map((h) => h.id);
       setFavoriteIds(userId, new Set(favs));
       cacheHistory(userId, next);
-      pushSettings(userId, { routine, goals: prefs.goals, avoid: prefs.avoid, favorites: favs });
+      pushSettings(userId, { routine, goals: prefs.goals, avoid: prefs.avoid, quiz: prefs.quiz, plan: prefs.plan, favorites: favs });
       return next;
     });
   };
@@ -336,6 +362,7 @@ const App: React.FC = () => {
   const startScan = async (mode: ScanMode) => {
     if (!userId) return open({ k: 'auth', mode: 'signup' });
     if (!user) return open({ k: 'onboarding', mode: 'new' });
+    if (mode === 'product' && !entitlement.active && scansToday(userId) >= FREE_SCANS_PER_DAY) return open({ k: 'scanLimit' });
     open({ k: 'scanner', mode });
   };
 
@@ -363,6 +390,7 @@ const App: React.FC = () => {
           return next;
         });
         addScanResult(userId, item);
+        countScan(userId);
         // If the person closed the scanner while waiting, keep the result in history but don't pop a sheet.
         if (overlaysRef.current[overlaysRef.current.length - 1]?.k === 'scanner') replaceTop({ k: 'product', id: item.id });
       } else {
@@ -389,7 +417,12 @@ const App: React.FC = () => {
           saveSkinHistory(userId, next);
           return next;
         });
-        if (overlaysRef.current[overlaysRef.current.length - 1]?.k === 'scanner') replaceTop({ k: 'skin', id: item.id });
+        if (pendingPlanRef.current && prefs.quiz) {
+          // Came from the quiz: rebuild the plan with what the selfie shows, then reveal it.
+          pendingPlanRef.current = false;
+          makePlan(prefs.quiz, item);
+          if (overlaysRef.current[overlaysRef.current.length - 1]?.k === 'scanner') replaceTop({ k: 'plan', building: true });
+        } else if (overlaysRef.current[overlaysRef.current.length - 1]?.k === 'scanner') replaceTop({ k: 'skin', id: item.id });
       }
     },
     [user, userId, replaceTop, skinHistory, routine, prefs, logs]
@@ -412,7 +445,7 @@ const App: React.FC = () => {
     if (!userId) return;
     setRoutine(r);
     saveRoutine(userId, r);
-    pushSettings(userId, { routine: r, goals: prefs.goals, avoid: prefs.avoid, favorites: history.filter((h) => h.isFavorite).map((h) => h.id) });
+    pushSettings(userId, { routine: r, goals: prefs.goals, avoid: prefs.avoid, quiz: prefs.quiz, plan: prefs.plan, favorites: history.filter((h) => h.isFavorite).map((h) => h.id) });
   };
 
   const applyScanRoutine = (scan?: SkinScanItem) => {
@@ -420,6 +453,115 @@ const App: React.FC = () => {
     if (!s) return;
     applyRoutine(routineFromScan(s));
     setRoutineSource(s.id);
+  };
+
+  // ---------- Quiz, plan, paywall ----------
+
+  const latestSkinCheck = () => [...skinHistory].sort((a, b) => b.timestamp - a.timestamp)[0];
+
+  const savePrefsAll = (p: DiaryPrefs) => {
+    setPrefs(p);
+    if (!userId) return;
+    savePrefs(userId, p);
+    pushSettings(userId, { routine, goals: p.goals, avoid: p.avoid, quiz: p.quiz, plan: p.plan, favorites: history.filter((h) => h.isFavorite).map((h) => h.id) });
+  };
+
+  /** Builds the plan from the quiz (and a skin check if there is one) and merges suggested avoid items. */
+  const makePlan = (quiz: SkinQuizData, latest?: SkinScanItem) => {
+    const plan = buildPlan(quiz, latest);
+    const current = prefs.avoid || [];
+    const added = suggestedAvoid(quiz, latest).filter((k) => !current.includes(k));
+    savePrefsAll({ ...prefs, quiz, plan, avoid: [...current, ...added] });
+    setPlanMeta({ addedAvoid: added, routineApplied: false });
+    return plan;
+  };
+
+  const finishQuiz = (quiz: SkinQuizData, withSelfie: boolean) => {
+    const latest = latestSkinCheck();
+    makePlan(quiz, latest);
+    if (withSelfie) {
+      pendingPlanRef.current = true;
+      replaceTop({ k: 'scanner', mode: 'skin' });
+    } else replaceTop({ k: 'plan', building: true });
+  };
+
+  const usePlanRoutine = () => {
+    if (!prefs.plan) return;
+    const items = (ids: string[]) => ids.map((id) => newRoutineItem(t(`plan_${id}` as TranslationKey)));
+    applyRoutine({ am: items(prefs.plan.am), pm: items(prefs.plan.pm), updatedAt: Date.now() });
+    setPlanMeta((m) => ({ ...m, routineApplied: true }));
+  };
+
+  const beginTrial = async (plan: 'annual' | 'monthly') => {
+    if (!userId) return;
+    const e = await startTrial(userId, plan);
+    setEntitlement(e);
+    if (e.active) close();
+  };
+
+  // Hard paywall: someone who finished the quiz but has no plan running sees the paywall on open.
+  useEffect(() => {
+    if (PAYWALL_MODE !== 'hard' || !userId || !prefs.quiz || entitlement.active) return;
+    if (!overlaysRef.current.some((o) => o.k === 'paywall' || o.k === 'quiz' || o.k === 'plan')) open({ k: 'paywall' });
+  }, [userId, prefs.quiz, entitlement.active]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---------- Meals ----------
+
+  const addMeal = async (file: File) => {
+    if (!user || !userId) return;
+    setMealBusy(true);
+    setMealError(false);
+    try {
+      const { dataUrl, base64 } = await fileToJpeg(file);
+      const svc = await import('./services/aiService');
+      const latest = latestSkinCheck();
+      const r = await svc.analyzeMeal(base64, user, latest ? { skinType: latest.skinType, concerns: latest.concerns } : {});
+      const id = crypto.randomUUID();
+      const thumb = await makeThumb(dataUrl, 240);
+      await savePhoto(id, thumb);
+      const meal: Meal = { ...r, id, ts: Date.now(), photoId: id };
+      const day = dateKey();
+      updateLog(day, { meals: [...(logs[day]?.meals || []), meal] });
+    } catch {
+      setMealError(true);
+    } finally {
+      setMealBusy(false);
+    }
+  };
+
+  const removeMeal = (id: string) => {
+    const day = dateKey();
+    updateLog(day, { meals: (logs[day]?.meals || []).filter((m) => m.id !== id) });
+  };
+
+  // ---------- Share progress ----------
+
+  const shareProgress = async () => {
+    const withPhotos = [...skinHistory].filter((s) => s.photoId || s.photoPath).sort((a, b) => a.timestamp - b.timestamp);
+    if (withPhotos.length < 2) return setShareStatus(t('shareNeedTwo'));
+    const first = withPhotos[0];
+    const last = withPhotos[withPhotos.length - 1];
+    const photo = async (s: SkinScanItem) => (await loadPhoto(s.photoId)) || (s.photoPath ? await downloadPhoto(s.photoPath) : null);
+    const [a, b] = await Promise.all([photo(first), photo(last)]);
+    if (!a || !b) return setShareStatus(t('shareNeedTwo'));
+    const locale = lang === AppLanguage.ZH ? 'zh-CN' : lang;
+    const fmt = (ts: number) => new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(ts);
+    const days = Math.max(1, Math.round((last.timestamp - first.timestamp) / 86400000));
+    try {
+      const blob = await drawShareCard({
+        before: a,
+        after: b,
+        beforeScore: scoreOf(first),
+        afterScore: scoreOf(last),
+        beforeLabel: fmt(first.timestamp),
+        afterLabel: fmt(last.timestamp),
+        title: t('shareTitle', { n: days })
+      });
+      const res = await shareBlob(blob, 'scanything-progress.png');
+      setShareStatus(res === 'downloaded' ? t('shareSaved') : undefined);
+    } catch {
+      setShareStatus(t('shareNeedTwo'));
+    }
   };
 
   const signOut = async () => {
@@ -430,7 +572,7 @@ const App: React.FC = () => {
         localStorage.removeItem(`vitalSense_history_${userId}`);
       }
     } catch { /* ignore */ }
-    setTab('home');
+    setTab('today');
   };
 
   // ---------- Rendering ----------
@@ -523,7 +665,7 @@ const App: React.FC = () => {
                 setPrefs(p);
                 if (userId) {
                   savePrefs(userId, p);
-                  pushSettings(userId, { routine, goals, avoid: prefs.avoid, favorites: history.filter((h) => h.isFavorite).map((h) => h.id) });
+                  pushSettings(userId, { routine, goals, avoid: prefs.avoid, quiz: prefs.quiz, plan: prefs.plan, favorites: history.filter((h) => h.isFavorite).map((h) => h.id) });
                 }
                 close();
               }}
@@ -541,11 +683,84 @@ const App: React.FC = () => {
                 setPrefs(p);
                 if (userId) {
                   savePrefs(userId, p);
-                  pushSettings(userId, { routine, goals: prefs.goals, avoid, favorites: history.filter((h) => h.isFavorite).map((h) => h.id) });
+                  pushSettings(userId, { routine, goals: prefs.goals, avoid, quiz: prefs.quiz, plan: prefs.plan, favorites: history.filter((h) => h.isFavorite).map((h) => h.id) });
                 }
                 close();
               }}
             />
+          </Sheet>
+        );
+      case 'quiz':
+        return (
+          <motion.div
+            key={key}
+            className="fixed inset-0 z-50 flex justify-center bg-canvas"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 30 }}
+            transition={sheetTransition}
+          >
+            <div className="relative w-full max-w-[450px] h-full">
+              <SkinQuiz t={t} rtl={rtl} initial={prefs.quiz} hasSkinCheck={skinHistory.length > 0} onClose={close} onDone={finishQuiz} />
+            </div>
+          </motion.div>
+        );
+      case 'plan':
+        if (!prefs.plan) return null;
+        return (
+          <Sheet key={key} onClose={close} label={t('planTitle')}>
+            <PlanView
+              t={t}
+              rtl={rtl}
+              plan={prefs.plan}
+              building={o.building}
+              usedSkinCheck={skinHistory.length > 0}
+              addedAvoid={o.building ? planMeta.addedAvoid || [] : []}
+              routineApplied={planMeta.routineApplied}
+              onUseRoutine={usePlanRoutine}
+              onRetake={() => replaceTop({ k: 'quiz' })}
+              onContinue={() => (entitlement.active ? close() : replaceTop({ k: 'paywall' }))}
+              onClose={close}
+            />
+          </Sheet>
+        );
+      case 'paywall':
+        return (
+          <motion.div
+            key={key}
+            className="fixed inset-0 z-50 flex justify-center bg-canvas"
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 40 }}
+            transition={sheetTransition}
+          >
+            <div className="relative w-full max-w-[450px] h-full">
+              <Paywall
+                t={t}
+                currency={lang === AppLanguage.ID ? 'idr' : 'usd'}
+                native={!!(window as any).Capacitor?.isNativePlatform?.()}
+                onStart={beginTrial}
+                onRestore={async () => {
+                  if (!userId) return;
+                  const e = await restorePurchases(userId);
+                  setEntitlement(e);
+                  if (e.active) close();
+                }}
+                onClose={close}
+              />
+            </div>
+          </motion.div>
+        );
+      case 'scanLimit':
+        return (
+          <Sheet key={key} onClose={close} height="auto" label={t('scanLimitTitle')}>
+            <div className="px-5 pt-9 pb-safe">
+              <h2 className="text-[22px] font-semibold text-ink">{t('scanLimitTitle')}</h2>
+              <p className="text-[15px] text-ink-muted mt-1.5 mb-5">{t('scanLimitBody', { n: FREE_SCANS_PER_DAY })}</p>
+              <div className="pb-2">
+                <PrimaryButton onClick={() => replaceTop({ k: 'paywall' })}>{t('unlock')}</PrimaryButton>
+              </div>
+            </div>
           </Sheet>
         );
       case 'compare': {
@@ -616,7 +831,8 @@ const App: React.FC = () => {
             onClose={o.mode === 'new' ? undefined : close}
             onComplete={(p) => {
               saveProfile(p);
-              close();
+              if (o.mode === 'new' && !prefs.quiz) replaceTop({ k: 'quiz' });
+              else close();
             }}
           />
         );
@@ -659,6 +875,33 @@ const App: React.FC = () => {
     );
   }
 
+  const diaryProps = {
+    t,
+    rtl,
+    lang,
+    signedIn: !!userId,
+    scans: skinHistory,
+    logs,
+    routine,
+    prefs,
+    productCount: history.length,
+    onCheckSkin: () => startScan('skin'),
+    onOpenSkin: (item: SkinScanItem) => open({ k: 'skin', id: item.id }),
+    onUpdateLog: updateLog,
+    onEditRoutine: () => open({ k: 'routineEdit' }),
+    onUseScanRoutine: () => applyScanRoutine(),
+    onEditGoals: () => open({ k: 'goals' }),
+    onCompare: (x: SkinScanItem, y: SkinScanItem) => open({ k: 'compare', a: x.id, b: y.id }),
+    onOpenProducts: () => open({ k: 'products' }),
+    onSignIn: () => open({ k: 'auth', mode: 'signin' })
+  };
+
+  const premiumLabel = entitlement.active
+    ? entitlement.trialEndsAt
+      ? t('premiumTrial', { date: new Intl.DateTimeFormat(lang === AppLanguage.ZH ? 'zh-CN' : lang, { day: 'numeric', month: 'short' }).format(entitlement.trialEndsAt) })
+      : t('premiumActive')
+    : t('premiumOff');
+
   const stats = {
     scans: history.length,
     saved: history.filter((h) => h.isFavorite).length,
@@ -680,7 +923,7 @@ const App: React.FC = () => {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.22 }}
           >
-            {tab === 'home' && (
+            {tab === 'today' && (
               <HomeView
                 t={t}
                 rtl={rtl}
@@ -691,32 +934,54 @@ const App: React.FC = () => {
                 onScan={startScan}
                 onOpenProduct={(item) => open({ k: 'product', id: item.id })}
                 onOpenSkin={(item) => open({ k: 'skin', id: item.id })}
-                onSeeAll={() => setTab('diary')}
+                onSeeAll={() => setTab('progress')}
                 onFeeling={() => open({ k: 'onboarding', mode: 'symptoms' })}
                 onProfile={() => setTab('profile')}
+                plan={userId ? (prefs.plan ? { focus: t(prefs.plan.focus as TranslationKey) } : null) : undefined}
+                onStartQuiz={() => open({ k: 'quiz' })}
+                onOpenPlan={() => open({ k: 'plan' })}
+                streak={streak(logs, skinHistory)}
+                todaySlot={
+                  userId ? (
+                    <DiaryView
+                      {...diaryProps}
+                      mode="today"
+                      mealsSlot={
+                        <MealsCard
+                          t={t}
+                          meals={logs[dateKey()]?.meals || []}
+                          busy={mealBusy}
+                          error={mealError}
+                          locale={lang === AppLanguage.ZH ? 'zh-CN' : lang}
+                          onAdd={addMeal}
+                          onRemove={removeMeal}
+                        />
+                      }
+                    />
+                  ) : null
+                }
               />
             )}
-            {tab === 'explore' && <ExploreView t={t} user={user} goals={prefs.goals} onOpen={(a) => open({ k: 'article', article: a })} onOpenFeed={(f) => open({ k: 'feedItem', item: f })} />}
-            {tab === 'diary' && (
+            {tab === 'progress' && (
               <DiaryView
+                {...diaryProps}
+                mode="progress"
+                premium={entitlement.active}
+                onUnlock={() => open({ k: 'paywall' })}
+                onShare={skinHistory.length >= 2 ? shareProgress : undefined}
+                shareStatus={shareStatus}
+              />
+            )}
+            {tab === 'foryou' && (
+              <ExploreView
                 t={t}
-                rtl={rtl}
-                lang={lang}
-                signedIn={!!userId}
-                scans={skinHistory}
-                logs={logs}
-                routine={routine}
-                prefs={prefs}
-                productCount={history.length}
-                onCheckSkin={() => startScan('skin')}
-                onOpenSkin={(item) => open({ k: 'skin', id: item.id })}
-                onUpdateLog={updateLog}
-                onEditRoutine={() => open({ k: 'routineEdit' })}
-                onUseScanRoutine={() => applyScanRoutine()}
-                onEditGoals={() => open({ k: 'goals' })}
-                onCompare={(x, y) => open({ k: 'compare', a: x.id, b: y.id })}
-                onOpenProducts={() => open({ k: 'products' })}
-                onSignIn={() => open({ k: 'auth', mode: 'signin' })}
+                user={user}
+                goals={prefs.goals}
+                title={t('forYouTitle')}
+                sub={t('forYouSub')}
+                top={userId ? <ForYouPicks t={t} lang={lang} latest={latestSkinCheck()} plan={prefs.plan} /> : undefined}
+                onOpen={(a) => open({ k: 'article', article: a })}
+                onOpenFeed={(f) => open({ k: 'feedItem', item: f })}
               />
             )}
             {tab === 'profile' && (
@@ -735,6 +1000,15 @@ const App: React.FC = () => {
                 onLanguage={() => open({ k: 'language' })}
                 avoidCount={(prefs.avoid || []).length}
                 onAvoid={() => open({ k: 'avoid' })}
+                premiumLabel={premiumLabel}
+                onPremium={() => {
+                  if (!userId) return;
+                  if (entitlement.active && entitlement.source === 'test') {
+                    endTestTrial(userId);
+                    setEntitlement(getEntitlement(userId));
+                  } else if (!entitlement.active) open({ k: 'paywall' });
+                }}
+                onPlan={() => open(prefs.plan ? { k: 'plan' } : { k: 'quiz' })}
                 onSignOut={signOut}
               />
             )}

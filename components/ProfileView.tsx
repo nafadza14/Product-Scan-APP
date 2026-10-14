@@ -1,5 +1,5 @@
 import React from 'react';
-import { Ban, ChevronRight, Cloud, Globe, HeartPulse, LogOut, Pencil, ScanLine, UserRound } from 'lucide-react';
+import { Ban, ChevronRight, Cloud, Crown, Globe, HeartPulse, LogOut, Pencil, ScanLine, Sparkles, UserRound } from 'lucide-react';
 import { AppLanguage, UserProfile } from '../types';
 import { Translator, conditionLabel, languageOptions, optionLabel } from '../i18n';
 import { Avatar, Pressable, PrimaryButton, SecondaryButton } from './ui';
@@ -19,6 +19,9 @@ interface Props {
   onLanguage: () => void;
   avoidCount?: number;
   onAvoid?: () => void;
+  premiumLabel?: string;
+  onPremium?: () => void;
+  onPlan?: () => void;
   onSignOut: () => void;
 }
 
@@ -47,7 +50,7 @@ const Row: React.FC<{
   );
 };
 
-const ProfileView: React.FC<Props> = ({ t, rtl, user, language, email, stats, hasApiKey, cloudStatus = 'unknown', onSignIn, onEditProfile, onUpdateSymptoms, onLanguage, avoidCount = 0, onAvoid, onSignOut }) => {
+const ProfileView: React.FC<Props> = ({ t, rtl, user, language, email, stats, hasApiKey, cloudStatus = 'unknown', onSignIn, onEditProfile, onUpdateSymptoms, onLanguage, avoidCount = 0, onAvoid, premiumLabel, onPremium, onPlan, onSignOut }) => {
   const langName = languageOptions.find((l) => l.code === language)?.native;
 
   if (!user) {
@@ -122,6 +125,8 @@ const ProfileView: React.FC<Props> = ({ t, rtl, user, language, email, stats, ha
         <div className="divide-y divide-canvas">
           <Row icon={<HeartPulse size={18} />} label={t('updateSymptoms')} onClick={onUpdateSymptoms} rtl={rtl} />
           <Row icon={<Pencil size={18} />} label={t('editProfile')} onClick={onEditProfile} rtl={rtl} />
+          {onPremium && <Row icon={<Crown size={18} />} label={t('premiumRow')} value={premiumLabel} onClick={onPremium} rtl={rtl} />}
+          {onPlan && <Row icon={<Sparkles size={18} />} label={t('planRow')} onClick={onPlan} rtl={rtl} />}
           {onAvoid && (
             <Row icon={<Ban size={18} />} label={t('avoidRow')} value={avoidCount ? t('avoidCount', { n: avoidCount }) : t('avoidNone')} onClick={onAvoid} rtl={rtl} />
           )}

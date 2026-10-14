@@ -19,7 +19,22 @@ export const TAGS: { id: string; key: TranslationKey; emoji: string }[] = [
   { id: 'lateNight', key: 'tagLateNight', emoji: '🌙' },
   { id: 'mask', key: 'tagMask', emoji: '🧖' }
 ];
-export const tagKey = (id: string): TranslationKey | null => TAGS.find((x) => x.id === id)?.key || null;
+export const FOOD_FLAGS: { id: string; key: TranslationKey; good: boolean }[] = [
+  { id: 'sugar', key: 'ff_sugar', good: false },
+  { id: 'highGI', key: 'ff_highGI', good: false },
+  { id: 'dairy', key: 'ff_dairy', good: false },
+  { id: 'fried', key: 'ff_fried', good: false },
+  { id: 'processed', key: 'ff_processed', good: false },
+  { id: 'spicy', key: 'ff_spicy', good: false },
+  { id: 'alcohol', key: 'ff_alcohol', good: false },
+  { id: 'caffeine', key: 'ff_caffeine', good: false },
+  { id: 'omega3', key: 'ff_omega3', good: true },
+  { id: 'veggies', key: 'ff_veggies', good: true },
+  { id: 'fruit', key: 'ff_fruit', good: true },
+  { id: 'protein', key: 'ff_protein', good: true },
+  { id: 'water', key: 'ff_water', good: true }
+];
+export const tagKey = (id: string): TranslationKey | null => TAGS.find((x) => x.id === id)?.key || FOOD_FLAGS.find((x) => x.id === id)?.key || null;
 
 export const GOALS: { id: SkinGoal; key: TranslationKey }[] = [
   { id: 'clearBreakouts', key: 'goalClearBreakouts' },

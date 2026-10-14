@@ -175,7 +175,62 @@ export interface DiaryLog {
   tags: string[];
   note?: string;
   done: { am: string[]; pm: string[] }; // routine step ids ticked off
+  meals?: Meal[];
   updatedAt?: number;
+}
+
+/** Food traits that matter for skin. Several share ids with diary tags (sugar, dairy, spicy, alcohol). */
+export type FoodFlag =
+  | 'sugar' | 'dairy' | 'fried' | 'spicy' | 'alcohol' | 'caffeine' | 'highGI' | 'processed'
+  | 'omega3' | 'veggies' | 'fruit' | 'protein' | 'water';
+
+export interface Meal {
+  id: string;
+  ts: number;
+  name: string;
+  emoji: string;
+  flags: FoodFlag[];
+  skin: 'good' | 'neutral' | 'bad';
+  note: string;
+  photoId?: string;
+}
+
+export type QuizConcern = 'breakouts' | 'marks' | 'dullness' | 'redness' | 'dryness' | 'pores' | 'lines';
+export type Freq = 0 | 1 | 2; // rarely / sometimes / daily (or low / medium / high)
+
+export interface SkinQuiz {
+  skinType: 'dry' | 'normal' | 'combination' | 'oily' | 'unsure';
+  concerns: QuizConcern[];
+  sensitive: 'yes' | 'sometimes' | 'no';
+  age: 'u25' | 'a25' | 'a35' | 'a45';
+  sugar: Freq;
+  dairy: Freq;
+  fried: Freq;
+  water: Freq;
+  sleep: Freq;
+  stress: Freq;
+  routine: Freq;
+  pregnancy: 'no' | 'pregnant' | 'breastfeeding';
+  source?: string;
+  completedAt: number;
+}
+
+/** Personal plan built from the quiz and the latest skin check. Items are copy ids (plan_*). */
+export interface SkinPlan {
+  focus: string;
+  reduce: string[];
+  add: string[];
+  am: string[];
+  pm: string[];
+  habits: string[];
+  createdAt: number;
+}
+
+export interface Entitlement {
+  active: boolean;
+  plan?: 'annual' | 'monthly';
+  trialEndsAt?: number;
+  source: 'none' | 'test' | 'store';
 }
 
 export interface RoutineItem {
@@ -195,6 +250,8 @@ export type SkinGoal = 'clearBreakouts' | 'evenTone' | 'hydration' | 'calmRednes
 export interface DiaryPrefs {
   goals: SkinGoal[];
   avoid?: AvoidKey[];
+  quiz?: SkinQuiz;
+  plan?: SkinPlan;
 }
 
 export interface Article {

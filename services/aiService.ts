@@ -13,8 +13,11 @@ import {
   ConcernId,
   Severity,
   SkinImpact,
-  AvoidKey
+  AvoidKey,
+  FoodFlag,
+  Meal
 } from '../types';
+import { apiUrl } from './apiBase';
 import { avoidLabel, detectAvoid, isAvoidKey } from './avoidService';
 
 // JSON Schema type names (the schemas below are sent to the model inside the prompt).
@@ -22,7 +25,7 @@ const Type = { OBJECT: 'object', STRING: 'string', NUMBER: 'number', BOOLEAN: 'b
 
 // Requests go to our own endpoint (/api/chat), which adds the Sumopod key on the server.
 // In dev, vite.config.ts proxies it; on Vercel, api/chat.js handles it.
-const ENDPOINT = '/api/chat';
+const ENDPOINT = apiUrl('/api/chat');
 
 const LANGUAGE_NAMES: Record<AppLanguage, string> = {
   [AppLanguage.EN]: 'English',
@@ -490,5 +493,54 @@ ${STYLE_RULES}`;
       .filter((r: any) => r.step),
     lookFor: list(data.lookFor, 5),
     avoid: list(data.avoid, 5)
+  };
+};
+
+// ---------- Meals ----------
+
+const FOOD_FLAGS: FoodFlag[] = ['sugar', 'dairy', 'fried', 'spicy', 'alcohol', 'caffeine', 'highGI', 'processed', 'omega3', 'veggies', 'fruit', 'protein', 'water'];
+
+export interface MealContext {
+  skinType?: string;
+  concerns?: string[];
+}
+
+export const analyzeMeal = async (imageBase64: string, userProfile: UserProfile, ctx: MealContext = {}): Promise<Omit<Meal, 'id' | 'ts' | 'photoId'>> => {
+  const language = LANGUAGE_NAMES[userProfile.language] || 'English';
+  const skinLine = ctx.skinType ? `Skin: ${ctx.skinType}; concerns: ${(ctx.concerns || []).join(', ') || 'none marked'}.` : 'No skin check yet.';
+  const systemInstruction = `
+You look at a photo of a meal, snack or drink and describe what matters for skin.
+Person: ${profileSummary(userProfile)}
+${skinLine}
+
+If the photo does not show food or drink, set "recognized" to false.
+"flags": pick every trait that clearly applies from: ${FOOD_FLAGS.join(', ')}.
+- sugar: sweets, sugary drinks, desserts. highGI: white rice, white bread, noodles, potatoes in large portions.
+- dairy: milk, cheese, whey, ice cream. fried: deep fried or greasy. processed: instant or packaged snacks, processed meat.
+- omega3: oily fish, walnuts, chia, flax. veggies, fruit, protein, water: when a real portion is visible.
+"skin": good, neutral or bad for THIS person's skin, using the evidence on glycemic load, dairy and acne, omega-3 and antioxidants. Say "may" where evidence is mixed.
+"note": one short sentence (under 18 words) on why, in ${language}.
+"name": short dish name in ${language}. "emoji": one emoji.
+${STYLE_RULES}`;
+  const schema = {
+    type: Type.OBJECT,
+    properties: {
+      recognized: { type: Type.BOOLEAN },
+      name: { type: Type.STRING },
+      emoji: { type: Type.STRING },
+      flags: { type: Type.ARRAY, items: { type: Type.STRING, enum: FOOD_FLAGS } },
+      skin: { type: Type.STRING, enum: ['good', 'neutral', 'bad'] },
+      note: { type: Type.STRING }
+    },
+    required: ['recognized', 'name', 'flags', 'skin', 'note']
+  };
+  const data = await callModel(imageBase64, systemInstruction, `What is this meal and how may it affect my skin? Answer in ${language}.`, schema);
+  if (data.recognized === false || !data.name) throw new AnalysisError('not_recognized');
+  return {
+    name: clean(data.name, '?'),
+    emoji: typeof data.emoji === 'string' && [...data.emoji].length <= 4 ? data.emoji : '🍽️',
+    flags: (Array.isArray(data.flags) ? data.flags : []).filter((f: any) => FOOD_FLAGS.includes(f)),
+    skin: data.skin === 'good' || data.skin === 'bad' ? data.skin : 'neutral',
+    note: clean(data.note)
   };
 };

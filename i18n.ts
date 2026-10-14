@@ -1,6 +1,7 @@
 import { AppLanguage, HealthCondition } from './types';
 import { diaryEn, diaryId, diaryFr, diaryAr, diaryZh } from './i18n-diary';
 import { matchEn, matchId, matchFr, matchAr, matchZh } from './i18n-match';
+import { growthEn, growthId } from './i18n-growth';
 
 const baseEn = {
   cancel: 'Cancel',
@@ -234,7 +235,7 @@ const baseEn = {
   condOtherSub: 'Tell us what to watch for'
 };
 
-const en = { ...baseEn, ...diaryEn, ...matchEn };
+const en = { ...baseEn, ...diaryEn, ...matchEn, ...growthEn };
 export type TranslationKey = keyof typeof en;
 type Dict = Record<TranslationKey, string>;
 type BaseDict = Record<keyof typeof baseEn, string>;
@@ -1123,10 +1124,10 @@ const zhBase: BaseDict = {
   condOtherSub: '告诉我们需要留意什么'
 };
 
-const id: Dict = { ...idBase, ...diaryId, ...matchId };
-const fr: Dict = { ...frBase, ...diaryFr, ...matchFr };
-const ar: Dict = { ...arBase, ...diaryAr, ...matchAr };
-const zh: Dict = { ...zhBase, ...diaryZh, ...matchZh };
+const id: Dict = { ...idBase, ...diaryId, ...matchId, ...growthId };
+const fr: Dict = { ...frBase, ...diaryFr, ...matchFr, ...growthEn, feedForYou: diaryFr.feedForYou };
+const ar: Dict = { ...arBase, ...diaryAr, ...matchAr, ...growthEn, feedForYou: diaryAr.feedForYou };
+const zh: Dict = { ...zhBase, ...diaryZh, ...matchZh, ...growthEn, feedForYou: diaryZh.feedForYou };
 
 const dictionaries: Record<AppLanguage, Dict> = {
   [AppLanguage.EN]: en,

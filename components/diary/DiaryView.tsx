@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Camera, Check, ChevronRight, Flame, GitCompare, Minus, NotebookPen, Pencil, Plus, ScanLine, Sparkles, Target, TrendingUp, X } from 'lucide-react';
+import { Camera, Check, ChevronRight, Flame, GitCompare, Lock, Minus, NotebookPen, Pencil, Plus, ScanLine, Share2, Sparkles, Target, TrendingUp, X } from 'lucide-react';
 import { AppLanguage, DiaryLog, DiaryPrefs, SkinScanItem, UserRoutine } from '../../types';
 import { Translator, TranslationKey } from '../../i18n';
 import { dateKey, emptyLog, findInsights, scoreOf, streak } from '../../services/diaryService';
@@ -9,6 +9,7 @@ import { GOALS, TAGS, Thumb, scoreColor, tagKey } from './shared';
 import TrendChart from './TrendChart';
 
 type Seg = 'today' | 'history' | 'trends';
+const LockIcon = Lock;
 
 interface Props {
   t: Translator;
@@ -29,6 +30,14 @@ interface Props {
   onCompare: (a: SkinScanItem, b: SkinScanItem) => void;
   onOpenProducts: () => void;
   onSignIn: () => void;
+  /** today: the daily diary shown on the Today tab. progress: patterns and timeline on the Progress tab. */
+  mode?: 'today' | 'progress';
+  /** Rendered right after today's skin check (the meals card). */
+  mealsSlot?: React.ReactNode;
+  premium?: boolean;
+  onUnlock?: () => void;
+  onShare?: () => void;
+  shareStatus?: string;
 }
 
 const FEELINGS: { v: 1 | 2 | 3 | 4 | 5; emoji: string; key: TranslationKey }[] = [
@@ -67,7 +76,8 @@ const Stepper: React.FC<{ label: string; value?: number; unit: (n: number) => st
 
 const DiaryView: React.FC<Props> = (p) => {
   const { t, rtl, lang, scans, logs, routine, prefs } = p;
-  const [seg, setSeg] = useState<Seg>('today');
+  const mode = p.mode || 'today';
+  const [seg, setSeg] = useState<Seg>(mode === 'progress' ? 'trends' : 'today');
   const [routineTime, setRoutineTime] = useState<'am' | 'pm'>(() => (new Date().getHours() >= 15 ? 'pm' : 'am'));
   const [compareMode, setCompareMode] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
@@ -99,7 +109,7 @@ const DiaryView: React.FC<Props> = (p) => {
   const historyDays = useMemo(() => {
     const keys = new Set<string>([...scans.map((s) => dateKey(s.timestamp)), ...Object.keys(logs).filter((d) => {
       const l = logs[d];
-      return l.feeling || l.tags.length || l.note || l.done.am.length || l.done.pm.length || l.sleep !== undefined;
+      return l.feeling || l.tags.length || l.note || l.done.am.length || l.done.pm.length || l.sleep !== undefined || (l.meals && l.meals.length);
     })]);
     return Array.from(keys)
       .sort()
@@ -109,10 +119,11 @@ const DiaryView: React.FC<Props> = (p) => {
   const insights = useMemo(() => findInsights(logs, scans, routine), [logs, scans, routine]);
 
   if (!p.signedIn) {
+    if (mode === 'today') return null;
     return (
       <div className="px-5 pt-safe pb-36">
-        <h1 className="pt-3 text-[32px] leading-none font-semibold tracking-[-0.02em] text-ink mb-2">{t('diaryTitle')}</h1>
-        <p className="text-[16px] text-ink-muted mb-4">{t('diarySub')}</p>
+        <h1 className="pt-3 text-[32px] leading-none font-semibold tracking-[-0.02em] text-ink mb-2">{t('progressTitle')}</h1>
+        <p className="text-[16px] text-ink-muted mb-4">{t('progressSub')}</p>
         <EmptyState icon={<NotebookPen size={28} />} title={t('historyEmptyTitle')} body={t('historyEmptyBody')} action={<PrimaryButton onClick={p.onSignIn}>{t('signIn')}</PrimaryButton>} />
       </div>
     );
@@ -168,6 +179,8 @@ const DiaryView: React.FC<Props> = (p) => {
           </div>
         )}
       </section>
+
+      {p.mealsSlot}
 
       {/* Routine */}
       <section className={`${card} p-4`}>
@@ -473,6 +486,18 @@ const DiaryView: React.FC<Props> = (p) => {
       <EmptyState icon={<TrendingUp size={28} />} title={t('trendEmptyTitle')} body={t('trendEmptyBody')} action={<PrimaryButton onClick={p.onCheckSkin}><Camera size={19} /> {t('todayCheckCta')}</PrimaryButton>} />
     ) : (
       <div className="space-y-4">
+        {p.onShare && (
+          <Pressable onClick={p.onShare} className={`${card} w-full p-4 text-start flex items-center gap-3`} data-testid="share-progress">
+            <span className="w-10 h-10 rounded-2xl bg-peach/15 text-peach flex items-center justify-center shrink-0">
+              <Share2 size={19} />
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-[15px] font-semibold text-ink">{t('shareProgress')}</span>
+              <span className="block text-[13px] text-ink-muted">{p.shareStatus || t('shareProgressSub')}</span>
+            </span>
+            <ChevronRight size={18} className={`text-ink-faint ${rtl ? 'rotate-180' : ''}`} />
+          </Pressable>
+        )}
         <div className="flex gap-2">
           {(['7', '30', 'all'] as const).map((r) => (
             <Chip key={r} active={range === r} onClick={() => setRange(r)}>
@@ -508,7 +533,27 @@ const DiaryView: React.FC<Props> = (p) => {
           <h2 className="text-[17px] font-semibold text-ink mb-2 flex items-center gap-2">
             <Sparkles size={17} className="text-coral" /> {t('insightsTitle')}
           </h2>
-          {insights.length === 0 ? (
+          {!p.premium ? (
+            <div data-testid="patterns-locked">
+              <div className="relative rounded-2xl overflow-hidden mb-3" aria-hidden>
+                <ul className="space-y-2.5 blur-[5px] select-none opacity-70">
+                  {['🍩', '🥛', '🐟'].map((e, i) => (
+                    <li key={e} className="flex gap-3 items-center">
+                      <span className="w-8 h-8 rounded-xl bg-white flex items-center justify-center">{e}</span>
+                      <span className="h-3 rounded-full bg-sage" style={{ width: `${70 - i * 12}%` }} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <p className="text-[15px] font-semibold text-ink flex items-center gap-1.5">
+                <LockIcon size={15} /> {t('foodPatternsLocked')}
+              </p>
+              <p className="text-[13.5px] text-ink-muted leading-snug mt-1 mb-3">{t('foodPatternsLockedBody')}</p>
+              <Pressable onClick={p.onUnlock} className="h-11 px-4 rounded-full bg-ink text-white text-[14px] font-semibold inline-flex items-center gap-2">
+                <Sparkles size={16} /> {t('unlock')}
+              </Pressable>
+            </div>
+          ) : insights.length === 0 ? (
             <p className="text-[14px] text-ink-muted leading-snug">{t('insightsWaiting')}</p>
           ) : (
             <>
@@ -558,17 +603,19 @@ const DiaryView: React.FC<Props> = (p) => {
       </div>
     );
 
+  if (mode === 'today') return todayView;
+
   return (
     <div className="px-5 pt-safe pb-36">
       <div className="pt-3 flex items-start justify-between gap-3 mb-1">
-        <h1 className="text-[32px] leading-none font-semibold tracking-[-0.02em] text-ink">{t('diaryTitle')}</h1>
+        <h1 className="text-[32px] leading-none font-semibold tracking-[-0.02em] text-ink">{t('progressTitle')}</h1>
         <span
           className={`shrink-0 h-9 px-3 rounded-full inline-flex items-center gap-1.5 text-[13.5px] font-semibold ${days > 0 ? 'bg-coral/10 text-coral' : 'bg-mist text-ink-muted'}`}
         >
           <Flame size={16} /> {days > 0 ? t('streakDays', { n: days }) : t('streakStart')}
         </span>
       </div>
-      <p className="text-[16px] text-ink-muted mb-4">{t('diarySub')}</p>
+      <p className="text-[16px] text-ink-muted mb-4">{t('progressSub')}</p>
 
       <div className="mb-4">
         <Segmented
@@ -576,9 +623,8 @@ const DiaryView: React.FC<Props> = (p) => {
           value={seg}
           onChange={setSeg}
           options={[
-            { value: 'today', label: t('segToday') },
-            { value: 'history', label: t('segHistory') },
-            { value: 'trends', label: t('segTrends') }
+            { value: 'trends', label: t('segPatterns') },
+            { value: 'history', label: t('segTimeline') }
           ]}
         />
       </div>

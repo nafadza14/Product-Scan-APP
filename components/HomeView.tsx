@@ -20,6 +20,13 @@ interface Props {
   onSeeAll: () => void;
   onFeeling: () => void;
   onProfile: () => void;
+  /** Signed-in only: the personal plan card that replaces the hero. */
+  plan?: { focus?: string } | null;
+  onStartQuiz?: () => void;
+  onOpenPlan?: () => void;
+  /** Today's diary (skin check, meals, routine), shown under the scan buttons. */
+  todaySlot?: React.ReactNode;
+  streak?: number;
 }
 
 export const statusColor = (s: ScanStatus) => (s === ScanStatus.SAFE ? '#2E8C68' : s === ScanStatus.CAUTION ? '#DB8F1F' : '#D2432F');
@@ -45,7 +52,12 @@ const HomeView: React.FC<Props> = ({
   onOpenSkin,
   onSeeAll,
   onFeeling,
-  onProfile
+  onProfile,
+  plan,
+  onStartQuiz,
+  onOpenPlan,
+  todaySlot,
+  streak = 0
 }) => {
   const firstName = user?.name?.trim().split(/\s+/)[0];
   const recent = [...history.map((h) => ({ kind: 'product' as const, ts: h.timestamp, item: h })), ...skinHistory.map((s) => ({ kind: 'skin' as const, ts: s.timestamp, item: s }))]
@@ -80,7 +92,31 @@ const HomeView: React.FC<Props> = ({
         </motion.div>
       )}
 
-      {/* Hero */}
+      {user && plan !== undefined ? (
+        plan && plan.focus ? (
+          <motion.section variants={rise} className="mb-4">
+            <Pressable onClick={onOpenPlan} className="w-full rounded-[28px] bg-leaf text-white p-5 text-start flex items-center gap-4" data-testid="plan-card">
+              <span className="flex-1 min-w-0">
+                <span className="block text-[13px] text-white/70">{t('planCardTitle')}</span>
+                <span className="block text-[21px] leading-tight font-semibold mt-1">{plan.focus}</span>
+                {streak > 0 && <span className="inline-block mt-2 h-7 px-2.5 rounded-full bg-white/15 text-[12.5px] font-semibold leading-7">🔥 {t('streakDays', { n: streak })}</span>}
+              </span>
+              <span className="h-10 px-4 rounded-full bg-white text-leaf text-[14px] font-semibold inline-flex items-center gap-1 shrink-0">
+                {t('planCardSee')} <ChevronRight size={16} className={rtl ? 'rotate-180' : ''} />
+              </span>
+            </Pressable>
+          </motion.section>
+        ) : (
+          <motion.section variants={rise} className="mb-4 rounded-[28px] bg-leaf text-white p-5 relative overflow-hidden" data-testid="plan-cta">
+            <img src="/icon.svg" alt="" aria-hidden className="absolute -end-6 -bottom-6 w-32 h-32 opacity-25 rotate-12" />
+            <h2 className="text-[22px] leading-tight font-semibold max-w-[85%]">{t('planCtaTitle')}</h2>
+            <p className="text-[14px] text-white/75 mt-2 leading-snug max-w-[85%]">{t('planCtaBody')}</p>
+            <Pressable onClick={onStartQuiz} className="mt-4 h-11 px-5 rounded-full bg-peach text-white text-[15px] font-semibold inline-flex items-center gap-1.5">
+              {t('planCtaButton')} <ArrowRight size={17} className={rtl ? 'rotate-180' : ''} />
+            </Pressable>
+          </motion.section>
+        )
+      ) : (
       <motion.section variants={rise} className="relative rounded-[28px] bg-sage overflow-hidden mb-4 min-h-[188px] flex">
         <div className="relative w-[44%] shrink-0">
           <div className="absolute inset-y-5 start-4 end-1 rotate-[-4deg] rounded-xl bg-white p-1.5 shadow-lift">
@@ -100,6 +136,7 @@ const HomeView: React.FC<Props> = ({
           </p>
         </div>
       </motion.section>
+      )}
 
       {/* Primary actions */}
       <motion.div variants={rise} className="space-y-3 mb-8">
@@ -131,6 +168,8 @@ const HomeView: React.FC<Props> = ({
           <ArrowRight size={20} className={`text-ink-faint ${rtl ? 'rotate-180' : ''}`} />
         </Pressable>
       </motion.div>
+
+      {todaySlot && <motion.div variants={rise} className="mb-8">{todaySlot}</motion.div>}
 
       {/* Recent scans */}
       <motion.section variants={rise} className="mb-8">

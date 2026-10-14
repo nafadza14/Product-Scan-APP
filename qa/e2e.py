@@ -126,6 +126,16 @@ SKIN = {
 }
 
 
+MEAL = {
+    "recognized": True,
+    "name": "Nasi goreng with iced milk tea",
+    "emoji": "🍛",
+    "flags": ["highGI", "fried", "sugar", "dairy"],
+    "skin": "bad",
+    "note": "Fried rice plus sweet milk tea may work against breakout-prone skin.",
+}
+
+
 def ai_route(route: Route):
     if route.request.method == "GET":
         return route.fulfill(status=200, content_type="application/json", body=json.dumps({"configured": True, "model": "gemini/gemini-3.1-flash-lite"}))
@@ -136,6 +146,8 @@ def ai_route(route: Route):
         return route.abort("internetdisconnected")
     if state["gemini"] == "not_recognized":
         payload = {"recognized": False, "productName": "", "category": "Other", "status": "CAUTION", "score": 0, "explanation": "", "ingredients": [], "alternatives": []}
+    elif "photo of a meal" in body:
+        payload = MEAL
     elif "selfie" in body:
         payload = SKIN
     else:
@@ -372,13 +384,54 @@ def main():
             page.get_by_role("button", name="Nausea").click()
             shot(page, "08-onboarding-3")
             page.get_by_role("button", name="Finish").click()
-            expect(page.get_by_role("heading", name=re.compile("Hi Sarah"))).to_be_visible(timeout=5000)
+            expect(page.get_by_test_id("skin-quiz")).to_be_visible(timeout=5000)
             assert state["profile"] and state["profile"]["condition"] == "Pregnancy", state["profile"]
             assert state["profile"]["name"] == "Sarah Putri"
             assert set(state["profile"]["additional_context"]) == {"2nd Trimester", "Gestational Diabetes"}
             assert state["profile"]["current_symptoms"] == ["Nausea"]
-            shot(page, "09-home-signed-in-empty")
         check("Sign in, onboarding saves profile with real name", sign_in_and_onboard)
+
+        def quiz_plan_paywall():
+            quiz = page.get_by_test_id("skin-quiz")
+            answers = ["Oily T-zone, normal cheeks", None, "Rarely", "25 to 34", "A few times a week", "A few times a week", "Rarely",
+                       "4 to 7 glasses", "6 to 7 hours", "Some stress", "Cleanser and moisturizer", "Pregnant", "TikTok"]
+            for n, a in enumerate(answers):
+                if a is None:
+                    quiz.get_by_role("checkbox", name="Breakouts").click()
+                    quiz.get_by_role("checkbox", name="Acne marks and dark spots").click()
+                    shot(page, "09a-quiz-concerns")
+                    quiz.get_by_role("button", name="Continue").click()
+                else:
+                    quiz.get_by_role("radio", name=a, exact=True).last.click()
+                page.wait_for_timeout(450)
+            expect(quiz.get_by_text("Add a selfie for a sharper plan")).to_be_visible()
+            quiz.get_by_role("button", name="Skip for now").click()
+            expect(page.get_by_test_id("plan-building")).to_be_visible(timeout=3000)
+            shot(page, "09b-plan-building")
+            plan = page.get_by_test_id("plan-view")
+            expect(plan).to_be_visible(timeout=6000)
+            expect(plan.get_by_text("Fewer breakouts")).to_be_visible()
+            expect(plan.get_by_text("Azelaic acid")).to_be_visible()  # pregnancy-friendly active, no retinoid
+            expect(plan.get_by_text("Retinoid", exact=True)).to_have_count(0)
+            expect(plan.get_by_text(re.compile("Added to your avoid list: Retinoids, Pore-clogging oils|Added to your avoid list: Pore-clogging oils, Retinoids"))).to_be_visible()
+            page.wait_for_timeout(600)
+            shot(page, "09c-plan")
+            page.get_by_role("button", name="Continue").click()
+            pw = page.get_by_test_id("paywall")
+            expect(pw).to_be_visible(timeout=4000)
+            expect(pw.get_by_text("7 days free, then $39.99 per year")).to_be_visible()
+            expect(pw.get_by_text("Test mode: no payment is taken in this version.")).to_be_visible()
+            page.wait_for_timeout(500)
+            shot(page, "09d-paywall")
+            pw.get_by_role("button", name="Not now").last.click()
+            page.wait_for_timeout(700)
+            expect(page.get_by_test_id("plan-card")).to_contain_text("Fewer breakouts")
+            page.wait_for_timeout(1200)
+            cs = state["cloud_settings"]
+            assert cs and cs.get("quiz", {}).get("source") == "tiktok" and cs.get("plan", {}).get("focus") == "focus_clear", cs
+            assert set(cs.get("avoid") or []) == {"retinoids", "comedogenic"}, cs.get("avoid")
+            shot(page, "09-home-signed-in-empty")
+        check("Skin quiz builds a personal plan, then the paywall (test mode)", quiz_plan_paywall)
 
         # ---------- Product scan ----------
         def product_scan():
@@ -450,7 +503,7 @@ def main():
 
         # ---------- Skin scan ----------
         def skin_scan():
-            page.get_by_text("Check your skin").click()
+            page.get_by_text("Check your skin", exact=True).click()
             expect(page.get_by_role("tab", name="Skin", selected=True)).to_be_visible(timeout=5000)
             expect(page.get_by_role("button", name="Take photo")).to_be_enabled(timeout=6000)
             page.wait_for_timeout(700)
@@ -462,7 +515,7 @@ def main():
             state["hold"] = False
             page.get_by_role("button", name="Close").click()
             page.wait_for_timeout(500)
-            page.get_by_text("Check your skin").click()
+            page.get_by_text("Check your skin", exact=True).click()
             expect(page.get_by_role("button", name="Take photo")).to_be_enabled(timeout=6000)
             page.wait_for_timeout(500)
             page.get_by_role("button", name="Take photo").click()
@@ -500,8 +553,7 @@ def main():
 
         # ---------- Diary ----------
         def diary_today():
-            page.get_by_role("button", name="Diary").click()
-            expect(page.get_by_role("heading", name="Skin diary")).to_be_visible()
+            page.get_by_role("navigation").get_by_role("button", name="Today").click()
             expect(page.get_by_text("1-day streak")).to_be_visible()
             expect(page.get_by_text("Today's skin check")).to_be_visible()
             # routine from the skin check, morning/evening checklist
@@ -544,7 +596,7 @@ def main():
         check("Goals and routine editor save", diary_goals_and_routine_edit)
 
         def avoid_list_and_skin_match():
-            page.get_by_role("button", name="Profile").click()
+            page.get_by_role("button", name="Profile").last.click()
             page.wait_for_timeout(500)
             page.get_by_role("button", name=re.compile("Avoid list")).click()
             page.get_by_role("checkbox", name="Added sugar").click()
@@ -552,10 +604,20 @@ def main():
             shot(page, "22b-avoid-list")
             page.get_by_role("button", name="Save changes").click()
             page.wait_for_timeout(1400)
-            expect(page.get_by_text("2 items")).to_be_visible()
-            assert state["cloud_settings"] and state["cloud_settings"].get("avoid") == ["addedSugar", "fragrance"], state["cloud_settings"]
-            page.get_by_role("button", name="Home").click()
+            expect(page.get_by_text("4 items")).to_be_visible()
+            assert state["cloud_settings"] and set(state["cloud_settings"].get("avoid")) == {"retinoids", "comedogenic", "addedSugar", "fragrance"}, state["cloud_settings"]
+            page.get_by_role("navigation").get_by_role("button", name="Today").click()
             page.wait_for_timeout(500)
+            page.evaluate("document.querySelectorAll('main').forEach(m => m.scrollTo(0, 0))")
+            # Three product scans already today: the free plan limit shows first.
+            page.get_by_text("Scan a product").click()
+            limit = page.get_by_role("dialog", name="You used today's free scans")
+            expect(limit).to_be_visible(timeout=4000)
+            expect(limit.get_by_text("The free plan includes 3 scans a day. Premium has no limit.")).to_be_visible()
+            shot(page, "22a-scan-limit")
+            page.go_back()
+            page.wait_for_timeout(600)
+            page.evaluate("Object.keys(localStorage).filter(k => k.startsWith('vitalSense_scans_')).forEach(k => localStorage.removeItem(k))")  # a new day
             page.get_by_text("Scan a product").click()
             expect(page.get_by_role("button", name="Take photo")).to_be_enabled(timeout=6000)
             page.wait_for_timeout(400)
@@ -572,6 +634,23 @@ def main():
             page.get_by_role("button", name="Close").first.click()
             page.wait_for_timeout(700)
         check("Avoid list and skin match personalize product results", avoid_list_and_skin_match)
+
+        def meal_logging():
+            page.get_by_role("navigation").get_by_role("button", name="Today").click()
+            card = page.get_by_test_id("meals-card")
+            card.scroll_into_view_if_needed()
+            page.get_by_test_id("meal-input").set_input_files(str(ROOT / "assets/label.png"))
+            expect(card.get_by_text("Nasi goreng with iced milk tea")).to_be_visible(timeout=8000)
+            expect(card.get_by_text("May work against your skin")).to_be_visible()
+            expect(card.get_by_text("Fast carbs")).to_be_visible()
+            assert "photo of a meal" in state["last_ai_body"]
+            page.wait_for_timeout(600)
+            card.scroll_into_view_if_needed()
+            shot(page, "22d-meals")
+            stored = page.evaluate(f"JSON.parse(localStorage.getItem('vitalSense_diary_{USER_ID}'))")
+            meals = [m for d in stored.values() for m in d.get("meals", [])]
+            assert len(meals) == 1 and "dairy" in meals[0]["flags"], meals
+        check("Meal photo logging saves food traits to the diary", meal_logging)
 
         def diary_history_trends_compare():
             # Seed two weeks of history so trends and patterns have data.
@@ -597,8 +676,8 @@ def main():
             }}""")
             page.reload()
             page.wait_for_load_state("networkidle")
-            page.get_by_role("button", name="Diary").click()
-            page.get_by_role("tab", name="History").click()
+            page.get_by_role("navigation").get_by_role("button", name="Progress").click()
+            page.get_by_role("tab", name="Timeline").click()
             expect(page.get_by_text("Diary entry").first.or_(page.get_by_text("Tried the new gel moisturizer.")).first).to_be_visible()
             shot(page, "23-diary-history")
             page.get_by_role("button", name="Compare").click()
@@ -610,21 +689,29 @@ def main():
             shot(page, "24-compare")
             page.get_by_role("button", name="Close").first.click()
             page.wait_for_timeout(600)
-            page.get_by_role("tab", name="Trends").click()
+            page.get_by_role("tab", name="Patterns").click()
             page.get_by_role("button", name="All", exact=True).click()
             expect(page.get_by_text("Patterns in your diary")).to_be_visible()
+            locked = page.get_by_test_id("patterns-locked")
+            expect(locked).to_be_visible()
+            locked.scroll_into_view_if_needed()
+            shot(page, "25a-patterns-locked")
+            locked.get_by_role("button", name="Unlock with Premium").click()
+            page.get_by_test_id("paywall").get_by_role("button", name="Start my free trial").click()
+            page.wait_for_timeout(700)
+            expect(page.get_by_test_id("paywall")).to_have_count(0)
             expect(page.get_by_text(re.compile("On days with sweets"))).to_be_visible()
             page.locator("main svg[role=img]").first.hover()
             page.wait_for_timeout(500)
             shot(page, "25-diary-trends")
             scroll_main_bottom(page)
             shot(page, "26-diary-metrics")
-        check("Diary history, compare two checks, trends and patterns", diary_history_trends_compare)
+            expect(page.get_by_test_id("share-progress")).to_be_visible()
+        check("Progress: timeline, compare, Premium unlock shows food and skin patterns", diary_history_trends_compare)
 
         def products_from_diary():
-            page.evaluate("document.querySelectorAll('main').forEach(m => m.scrollTo(0, 0))")
-            page.get_by_role("tab", name="Today").click()
-            scroll_main_bottom(page)
+            page.get_by_role("navigation").get_by_role("button", name="Today").click()
+            page.get_by_role("button", name=re.compile("Product scans")).scroll_into_view_if_needed()
             page.get_by_role("button", name=re.compile("Product scans")).click()
             dlg = page.get_by_role("dialog")
             expect(dlg.get_by_text("Honey Oat Granola").first).to_be_visible()
@@ -635,10 +722,21 @@ def main():
             expect(page.get_by_role("dialog")).to_have_count(0)
         check("Product scans open from the diary, system back closes", products_from_diary)
 
+        def for_you_picks():
+            page.get_by_role("navigation").get_by_role("button", name="For you").click()
+            picks = page.get_by_test_id("for-you-picks")
+            expect(picks.get_by_text("Niacinamide").first).to_be_visible(timeout=4000)
+            link = picks.get_by_role("link", name="Shop: Niacinamide")
+            href = link.get_attribute("href")
+            assert href.startswith("https://www.amazon.com/s?k=Niacinamide") and "sponsored" in link.get_attribute("rel"), href
+            expect(picks.get_by_text(re.compile("affiliate links"))).to_be_visible()
+            shot(page, "26b-for-you")
+        check("For you: picks from the skin check and plan with labelled shop links", for_you_picks)
+
         # ---------- Explore ----------
         def explore():
-            page.get_by_role("button", name="Explore").click()
-            expect(page.get_by_text("Short reads picked for Pregnancy")).to_be_visible()
+            page.get_by_role("navigation").get_by_role("button", name="For you").click()
+            expect(page.get_by_text("Picked for your skin and your plan.")).to_be_visible()
             expect(page.get_by_text(re.compile(r"312 articles from \d+ sources"))).to_be_visible(timeout=5000)
             q = state["feed_queries"][-1]
             assert "condition=Pregnancy" in q and "Gestational+Diabetes" in q and "goals=clearBreakouts" in q, q
@@ -650,8 +748,8 @@ def main():
             page.wait_for_timeout(600)
             assert page.locator("main ul li").count() > 20, "infinite list loads more"
             page.evaluate("document.querySelectorAll('main').forEach(m => m.scrollTo(0, 0))")
-            page.get_by_role("button", name="For you").click()
-            page.locator("main ul li").first.click()
+            page.get_by_role("button", name="Top picks").click()
+            page.get_by_role("button", name=re.compile("Because of")).first.click()
             page.wait_for_timeout(700)
             link = page.get_by_role("link", name=re.compile("Read the full article on"))
             expect(link).to_be_visible()
@@ -686,7 +784,8 @@ def main():
         check("Profile: update symptoms saves, edit opens prefilled", profile)
 
         def home_feeling_card():
-            page.get_by_role("button", name="Home").click()
+            page.get_by_role("navigation").get_by_role("button", name="Today").click()
+            page.get_by_text("How do you feel today?").scroll_into_view_if_needed()
             page.get_by_text("How do you feel today?").click()
             expect(page.get_by_role("button", name="Headache")).to_have_attribute("aria-pressed", "true")
             page.get_by_role("button", name="Close").click()
@@ -701,7 +800,7 @@ def main():
             page.get_by_role("radio", name=re.compile("العربية")).click()
             page.wait_for_timeout(500)
             assert page.evaluate("document.documentElement.dir") == "rtl"
-            page.get_by_role("button", name="الرئيسية").click()
+            page.get_by_role("navigation").get_by_role("button", name="Today").click()
             shot(page, "28-home-arabic-rtl")
             page.get_by_role("button", name="الملف").last.click()
             page.wait_for_timeout(300)
@@ -716,9 +815,9 @@ def main():
             page.reload()
             page.wait_for_load_state("networkidle")
             expect(page.get_by_role("heading", name=re.compile("Hi Sarah"))).to_be_visible(timeout=6000)
-            page.get_by_role("button", name="Diary").click()
+            page.get_by_role("navigation").get_by_role("button", name="Today").click()
             expect(page.get_by_text("Clear breakouts, Hydration")).to_be_visible()
-            scroll_main_bottom(page)
+            page.get_by_role("button", name=re.compile("Product scans")).scroll_into_view_if_needed()
             page.get_by_role("button", name=re.compile("Product scans")).click()
             dlg = page.get_by_role("dialog")
             dlg.get_by_role("button", name="Saved", exact=True).first.click()
@@ -738,11 +837,14 @@ def main():
             page.reload()
             page.wait_for_load_state("networkidle")
             expect(page.get_by_role("heading", name=re.compile("Hi Sarah"))).to_be_visible(timeout=6000)
-            page.get_by_role("button", name="Diary").click()
+            page.get_by_role("navigation").get_by_role("button", name="Today").click()
             expect(page.get_by_text("Clear breakouts, Hydration")).to_be_visible(timeout=5000)
-            page.get_by_role("tab", name="History").click()
+            expect(page.get_by_test_id("plan-card")).to_contain_text("Fewer breakouts")
+            expect(page.get_by_text("Nasi goreng with iced milk tea")).to_be_visible()
+            page.get_by_role("navigation").get_by_role("button", name="Progress").click()
+            page.get_by_role("tab", name="Timeline").click()
             expect(page.get_by_text("Tried the new gel moisturizer.")).to_be_visible()
-            page.get_by_role("tab", name="Today").click()
+            page.get_by_role("navigation").get_by_role("button", name="Today").click()
             page.get_by_role("tab", name=re.compile("Morning")).click()
             expect(page.get_by_text("2 of 4 done")).to_be_visible()
             img = page.locator("main img").first

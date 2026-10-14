@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Star, ScanLine, AlertTriangle, ChevronDown, Leaf, Wheat, Milk, Sprout, Sparkles, Ban, ThumbsUp, Minus, ThumbsDown, Camera } from 'lucide-react';
-import { MacroNutrient, ScanHistoryItem, ScanStatus, UserProfile } from '../types';
+import { Star, ScanLine, AlertTriangle, ChevronDown, Leaf, Wheat, Milk, Sprout, Sparkles, Ban, ThumbsUp, Minus, ThumbsDown, Camera, ShoppingBag } from 'lucide-react';
+import { shopUrl } from '../services/affiliate';
+import { AppLanguage, MacroNutrient, ScanHistoryItem, ScanStatus, UserProfile } from '../types';
 import { Translator, TranslationKey, conditionLabel } from '../i18n';
 import { NavBar, Pressable, ProductIcon, Ring, useCountUp } from './ui';
 import { statusColor } from './HomeView';
@@ -361,9 +362,18 @@ const ProductResult: React.FC<Props> = ({ t, rtl, item, user, onClose, onToggleF
                     </span>
                     <p className="text-[15px] font-semibold text-ink leading-snug mb-1">{alt.name}</p>
                     <p className="text-[13px] text-ink-muted leading-snug">{alt.reason}</p>
+                    <a
+                      href={shopUrl(alt.name, user?.language || AppLanguage.EN)}
+                      target="_blank"
+                      rel="noopener noreferrer sponsored"
+                      className="mt-3 h-8 px-3 rounded-full bg-ink text-white text-[12.5px] font-semibold inline-flex items-center gap-1.5"
+                    >
+                      <ShoppingBag size={13} /> {t('shop')}
+                    </a>
                   </div>
                 ))}
               </div>
+              <p className="text-[12px] text-ink-faint leading-snug mt-2">{t('affiliateNote')}</p>
             </motion.section>
           )}
 

@@ -1,15 +1,15 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Home, Compass, ScanLine, NotebookPen, UserRound } from 'lucide-react';
+import { Sun, Sparkles, ScanLine, TrendingUp, UserRound } from 'lucide-react';
 import { Translator } from '../i18n';
 import { Pressable, haptic, softSpring } from './ui';
 
-export type Tab = 'home' | 'explore' | 'diary' | 'profile';
+export type Tab = 'today' | 'progress' | 'foryou' | 'profile';
 
-const ITEMS: { id: Tab; icon: React.ElementType; label: 'tabHome' | 'tabExplore' | 'tabDiary' | 'tabProfile' }[] = [
-  { id: 'home', icon: Home, label: 'tabHome' },
-  { id: 'explore', icon: Compass, label: 'tabExplore' },
-  { id: 'diary', icon: NotebookPen, label: 'tabDiary' },
+const ITEMS: { id: Tab; icon: React.ElementType; label: 'tabToday' | 'tabProgress' | 'tabForYou' | 'tabProfile' }[] = [
+  { id: 'today', icon: Sun, label: 'tabToday' },
+  { id: 'progress', icon: TrendingUp, label: 'tabProgress' },
+  { id: 'foryou', icon: Sparkles, label: 'tabForYou' },
   { id: 'profile', icon: UserRound, label: 'tabProfile' }
 ];
 

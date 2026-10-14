@@ -34,9 +34,39 @@ Add `SUMOPOD_API_KEY` under Project Settings, Environment Variables, then redepl
 | Explore | 200+ live articles from public health RSS feeds (`/api/feed`), ranked for each person's condition, details, symptoms and skin goals, with the reason shown; plus quick guides |
 | Profile | Health profile, symptoms, avoid list (sugar, dairy, gluten, palm oil, sweeteners, caffeine, fragrance, alcohol, essential oils, parabens, sulfates, silicones, retinoids, pore-clogging oils), language (EN, ID, AR with RTL, FR, ZH), sign out |
 
+## Layout
+
+Tabs: **Today** (plan card, scan buttons, today's skin check, meal photos, routine, diary), **Scan** (centre button), **Progress** (patterns between food, diary and skin score, timeline, compare, share card), **For you** (ingredients and product types for your skin with labelled shop links, articles), **Profile**.
+
+New users: onboarding, then a 13-question skin quiz, optional selfie, "building your plan", the personal plan (eat less, eat more, AM/PM routine, habits, avoid list additions), then the paywall.
+
+## Premium and paywall
+
+- Free: 3 product scans a day, diary, meals, plan. Premium: food and skin patterns, unlimited scans.
+- Web: the paywall runs in **test mode** (no charge, 7-day trial unlocked on the device) so trial starts can be measured before billing exists.
+- Native app: purchases go through RevenueCat (`services/billing.ts`). Create an entitlement called `premium` with yearly and monthly packages in the current offering.
+- `VITE_PAYWALL_MODE=hard` makes the paywall required after the quiz (default `soft`, can be dismissed).
+
+## Native app (App Store and Google Play)
+
+Capacitor wraps the same web build (`capacitor.config.ts`, `android/`, `ios/`).
+
+```bash
+VITE_API_BASE=https://your-domain npm run build   # native app calls the deployed /api
+npx cap sync
+npx cap open android   # Android Studio
+npx cap open ios       # Xcode on a Mac
+```
+
+Env for native builds: `VITE_API_BASE`, `VITE_REVENUECAT_IOS_KEY`, `VITE_REVENUECAT_ANDROID_KEY`. The API allows the Capacitor origins (`server/cors.js`). Icons and splash come from `assets/` (`npx @capacitor/assets generate`).
+
+## Shop links
+
+`VITE_AMAZON_TAG` (global) and `VITE_SHOPEE_AFF_ID` (Indonesian language) turn shop buttons into affiliate links. Without them they are plain search links. Links are marked `rel="sponsored"` and labelled in the app; scores never depend on them.
+
 ## Supabase setup (once)
 
-Open Supabase Dashboard, SQL Editor, paste `supabase/setup.sql` and run it. It creates `skin_checks`, adds `avoid` to `user_settings`, `diary_logs`, `user_settings`, a private `skin-photos` storage bucket, adds `language` to `profiles` and `category` to `scans`, and sets Row Level Security so each person only sees their own rows.
+Open Supabase Dashboard, SQL Editor, paste `supabase/setup.sql` and run it. It creates `skin_checks`, adds `avoid`, `quiz` and `plan` to `user_settings`, `diary_logs`, `user_settings`, a private `skin-photos` storage bucket, adds `language` to `profiles` and `category` to `scans`, and sets Row Level Security so each person only sees their own rows.
 
 Until it is run, the app still works, but the diary stays on the device (Profile shows Backup: This device only).
 

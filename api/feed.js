@@ -1,7 +1,9 @@
 import { handleFeed } from '../server/feed.js';
+import { applyCors } from '../server/cors.js';
 
 
 export default async function handler(req, res) {
+  if (applyCors(req, res)) return;
   try {
     const { status, body } = await handleFeed(req.method, req.query || {});
     // Cache each personalized URL at the edge for 30 minutes, serve stale while refreshing.

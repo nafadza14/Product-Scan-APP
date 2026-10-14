@@ -62,6 +62,8 @@ create table if not exists public.user_settings (
   updated_at bigint not null default 0
 );
 alter table public.user_settings add column if not exists avoid jsonb;
+alter table public.user_settings add column if not exists quiz jsonb;
+alter table public.user_settings add column if not exists plan jsonb;
 alter table public.user_settings enable row level security;
 drop policy if exists "vs_settings_all_own" on public.user_settings;
 create policy "vs_settings_all_own" on public.user_settings for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

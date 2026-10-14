@@ -1,3 +1,4 @@
+import { apiUrl } from '../services/apiBase';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { ChevronLeft, Share2, Check, ExternalLink } from 'lucide-react';
@@ -94,7 +95,7 @@ const useFeed = (user: UserProfile | null, goals: SkinGoal[]) => {
   useEffect(() => {
     let alive = true;
     const ctrl = new AbortController();
-    fetch(`/api/feed?${params}`, { signal: ctrl.signal })
+    fetch(apiUrl(`/api/feed?${params}`), { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((d) => {
         if (!alive) return;
@@ -121,7 +122,11 @@ export const ExploreView: React.FC<{
   goals: SkinGoal[];
   onOpen: (a: Article) => void;
   onOpenFeed: (f: FeedItem) => void;
-}> = ({ t, user, goals, onOpen, onOpenFeed }) => {
+  title?: string;
+  sub?: string;
+  /** Rendered between the header and the article list (For you picks). */
+  top?: React.ReactNode;
+}> = ({ t, user, goals, onOpen, onOpenFeed, title, sub, top }) => {
   const lang = user?.language || AppLanguage.EN;
   const guides = useMemo(() => getDailyFeed(user), [user]);
   const feed = useFeed(user, goals);
@@ -155,12 +160,14 @@ export const ExploreView: React.FC<{
   return (
     <div className="pt-safe pb-36">
       <div className="px-5 pt-3 mb-4">
-        <h1 className="text-[32px] leading-none font-semibold tracking-[-0.02em] text-ink">{t('exploreTitle')}</h1>
-        <p className="text-[16px] text-ink-muted mt-2">{t('exploreSub', { condition: conditionLabel(t, user) })}</p>
+        <h1 className="text-[32px] leading-none font-semibold tracking-[-0.02em] text-ink">{title || t('exploreTitle')}</h1>
+        <p className="text-[16px] text-ink-muted mt-2">{sub || t('exploreSub', { condition: conditionLabel(t, user) })}</p>
         {feed.status === 'ready' && (
           <p className="text-[13px] text-ink-faint mt-1">{t('feedCount', { n: feed.items.length, s: feed.sources.length, t: when })}</p>
         )}
       </div>
+
+      {top}
 
       {feed.items.length > 0 && (
         <div className="flex gap-2 overflow-x-auto no-scrollbar px-5 pb-4">

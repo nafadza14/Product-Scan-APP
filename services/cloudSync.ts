@@ -36,7 +36,7 @@ const handleError = (e: any) => {
 export interface CloudSnapshot {
   scans: SkinScanItem[];
   logs: Record<string, DiaryLog>;
-  settings: { routine: UserRoutine | null; goals: DiaryPrefs['goals'] | null; avoid: DiaryPrefs['avoid'] | null; favorites: string[] | null; updatedAt: number } | null;
+  settings: { routine: UserRoutine | null; goals: DiaryPrefs['goals'] | null; avoid: DiaryPrefs['avoid'] | null; quiz: DiaryPrefs['quiz'] | null; plan: DiaryPrefs['plan'] | null; favorites: string[] | null; updatedAt: number } | null;
 }
 
 export const pullAll = async (userId: string): Promise<CloudSnapshot | null> => {
@@ -59,6 +59,8 @@ export const pullAll = async (userId: string): Promise<CloudSnapshot | null> => 
           routine: settings.data.routine || null,
           goals: settings.data.goals || null,
           avoid: settings.data.avoid || null,
+          quiz: settings.data.quiz || null,
+          plan: settings.data.plan || null,
           favorites: settings.data.favorites || null,
           updatedAt: Number(settings.data.updated_at) || 0
         }
@@ -105,14 +107,17 @@ export const pushLog = (userId: string, log: DiaryLog) => {
 };
 
 let settingsTimer: number | undefined;
-export const pushSettings = (userId: string, s: { routine: UserRoutine | null; goals: DiaryPrefs['goals']; avoid?: DiaryPrefs['avoid']; favorites: string[] }) => {
+export const pushSettings = (
+  userId: string,
+  s: { routine: UserRoutine | null; goals: DiaryPrefs['goals']; avoid?: DiaryPrefs['avoid']; quiz?: DiaryPrefs['quiz']; plan?: DiaryPrefs['plan']; favorites: string[] }
+) => {
   if (status === 'not_set_up') return;
   window.clearTimeout(settingsTimer);
   settingsTimer = window.setTimeout(async () => {
     let { error } = await supabase.from('user_settings').upsert({ user_id: userId, ...s, updated_at: Date.now() });
-    // Older databases have no "avoid" column until setup.sql is run again; keep the rest in sync.
-    if (error && (error.code === 'PGRST204' || /avoid/.test(error.message || ''))) {
-      const { avoid: _skip, ...rest } = s;
+    // Older databases lack the newer columns until setup.sql is run again; keep the rest in sync.
+    if (error && (error.code === 'PGRST204' || /avoid|quiz|plan/.test(error.message || ''))) {
+      const { avoid: _a, quiz: _q, plan: _p, ...rest } = s;
       ({ error } = await supabase.from('user_settings').upsert({ user_id: userId, ...rest, updated_at: Date.now() }));
     }
     handleError(error);
