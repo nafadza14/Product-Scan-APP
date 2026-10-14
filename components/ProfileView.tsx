@@ -1,5 +1,6 @@
 import React from 'react';
-import { Ban, ChevronRight, Cloud, Crown, Globe, HeartPulse, LogOut, Pencil, ScanLine, Sparkles, UserRound } from 'lucide-react';
+import { Ban, ChevronRight, Cloud, Crown, FileText, Globe, HeartPulse, LogOut, Pencil, ScanLine, ShieldCheck, Sparkles, Trash2, UserRound } from 'lucide-react';
+import { openLegal } from '../services/legal';
 import { AppLanguage, UserProfile } from '../types';
 import { Translator, conditionLabel, languageOptions, optionLabel } from '../i18n';
 import { Avatar, Pressable, PrimaryButton, SecondaryButton } from './ui';
@@ -22,6 +23,7 @@ interface Props {
   premiumLabel?: string;
   onPremium?: () => void;
   onPlan?: () => void;
+  onDeleteAccount?: () => void;
   onSignOut: () => void;
 }
 
@@ -50,7 +52,7 @@ const Row: React.FC<{
   );
 };
 
-const ProfileView: React.FC<Props> = ({ t, rtl, user, language, email, stats, hasApiKey, cloudStatus = 'unknown', onSignIn, onEditProfile, onUpdateSymptoms, onLanguage, avoidCount = 0, onAvoid, premiumLabel, onPremium, onPlan, onSignOut }) => {
+const ProfileView: React.FC<Props> = ({ t, rtl, user, language, email, stats, hasApiKey, cloudStatus = 'unknown', onSignIn, onEditProfile, onUpdateSymptoms, onLanguage, avoidCount = 0, onAvoid, premiumLabel, onPremium, onPlan, onDeleteAccount, onSignOut }) => {
   const langName = languageOptions.find((l) => l.code === language)?.native;
 
   if (!user) {
@@ -144,8 +146,15 @@ const ProfileView: React.FC<Props> = ({ t, rtl, user, language, email, stats, ha
         />
       </div>
 
-      <div className="rounded-3xl bg-mist overflow-hidden">
+      <h2 className="text-[15px] font-semibold text-ink-muted px-1 mb-2">{t('legalSection')}</h2>
+      <div className="rounded-3xl bg-mist divide-y divide-canvas mb-6 overflow-hidden">
+        <Row icon={<ShieldCheck size={18} />} label={t('privacyLink')} onClick={() => openLegal('privacy')} rtl={rtl} />
+        <Row icon={<FileText size={18} />} label={t('termsLink')} onClick={() => openLegal('terms')} rtl={rtl} />
+      </div>
+
+      <div className="rounded-3xl bg-mist divide-y divide-canvas overflow-hidden">
         <Row icon={<LogOut size={18} />} label={t('signOut')} onClick={onSignOut} danger />
+        {onDeleteAccount && <Row icon={<Trash2 size={18} />} label={t('deleteAccount')} onClick={onDeleteAccount} danger />}
       </div>
     </div>
   );

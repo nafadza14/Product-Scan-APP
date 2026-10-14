@@ -53,6 +53,8 @@ import PlanView from './components/growth/PlanView';
 import Paywall from './components/growth/Paywall';
 import MealsCard from './components/growth/MealsCard';
 import ForYouPicks from './components/growth/ForYouPicks';
+import DeleteAccountSheet from './components/growth/DeleteAccountSheet';
+import { deleteAccount } from './services/account';
 import { FREE_SCANS_PER_DAY, PAYWALL_MODE, countScan, endTestTrial, getEntitlement, restorePurchases, scansToday, startTrial, syncEntitlement } from './services/billing';
 import { buildPlan, suggestedAvoid } from './services/planService';
 import { fileToJpeg } from './services/imageUtil';
@@ -82,6 +84,7 @@ type Overlay =
   | { k: 'plan'; building?: boolean }
   | { k: 'paywall' }
   | { k: 'scanLimit' }
+  | { k: 'deleteAccount' }
   | { k: 'compare'; a: string; b: string }
   | { k: 'products' };
 
@@ -751,6 +754,21 @@ const App: React.FC = () => {
             </div>
           </motion.div>
         );
+      case 'deleteAccount':
+        return (
+          <Sheet key={key} onClose={close} height="auto" label={t('deleteTitle')}>
+            <DeleteAccountSheet
+              t={t}
+              onCancel={close}
+              onDelete={async () => {
+                if (!userId) return;
+                await deleteAccount(userId);
+                closeAll();
+                setTab('today');
+              }}
+            />
+          </Sheet>
+        );
       case 'scanLimit':
         return (
           <Sheet key={key} onClose={close} height="auto" label={t('scanLimitTitle')}>
@@ -1009,6 +1027,7 @@ const App: React.FC = () => {
                   } else if (!entitlement.active) open({ k: 'paywall' });
                 }}
                 onPlan={() => open(prefs.plan ? { k: 'plan' } : { k: 'quiz' })}
+                onDeleteAccount={userId ? () => open({ k: 'deleteAccount' }) : undefined}
                 onSignOut={signOut}
               />
             )}

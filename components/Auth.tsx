@@ -4,6 +4,7 @@ import { AlertCircle, Copy, Check, Eye, EyeOff, MailCheck } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { isNative, NATIVE_AUTH_REDIRECT, openAuthBrowser } from '../services/native';
 import { Translator } from '../i18n';
+import { legalUrl } from '../services/legal';
 import { NavBar, Pressable, PrimaryButton, SecondaryButton } from './ui';
 
 interface Props {
@@ -34,7 +35,7 @@ const Auth: React.FC<Props> = ({ t, rtl, initialMode, onClose }) => {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [showPw, setShowPw] = useState(false);
-  const [loading, setLoading] = useState<'email' | 'google' | null>(null);
+  const [loading, setLoading] = useState<'email' | 'google' | 'apple' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [redirectError, setRedirectError] = useState(false);
   const [confirmSent, setConfirmSent] = useState(false);
@@ -67,19 +68,19 @@ const Auth: React.FC<Props> = ({ t, rtl, initialMode, onClose }) => {
     }
   };
 
-  const google = async () => {
-    setLoading('google');
+  const oauth = async (provider: 'google' | 'apple') => {
+    setLoading(provider);
     setError(null);
     setRedirectError(false);
     // Native app: Supabase returns the URL, we open it in the in-app browser and come back via the
     // online.scanything.app://auth-callback deep link (handled in services/native.ts).
     const native = isNative();
     const { data, error: err } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      provider,
       options: {
         redirectTo: native ? NATIVE_AUTH_REDIRECT : redirectUrl(),
         skipBrowserRedirect: native,
-        queryParams: { access_type: 'offline', prompt: 'select_account' }
+        queryParams: provider === 'google' ? { access_type: 'offline', prompt: 'select_account' } : undefined
       }
     });
     if (!err && native && data?.url) {
@@ -198,7 +199,7 @@ const Auth: React.FC<Props> = ({ t, rtl, initialMode, onClose }) => {
           <span className="h-px flex-1 bg-sage-deep/40" />
         </div>
 
-        <SecondaryButton onClick={google} disabled={!!loading}>
+        <SecondaryButton onClick={() => oauth('google')} disabled={!!loading}>
           <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden>
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
             <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
@@ -207,6 +208,32 @@ const Auth: React.FC<Props> = ({ t, rtl, initialMode, onClose }) => {
           </svg>
           {loading === 'google' ? t('working') : t('google')}
         </SecondaryButton>
+
+        <Pressable
+          onClick={() => oauth('apple')}
+          disabled={!!loading}
+          className="mt-3 h-14 w-full rounded-full bg-black text-white font-semibold text-[16px] flex items-center justify-center gap-2"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden>
+            <path
+              fill="currentColor"
+              d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.7-3.18-1.73-1.35-.14-2.64.8-3.33.8-.69 0-1.74-.78-2.87-.76-1.47.02-2.83.86-3.59 2.17-1.54 2.66-.39 6.6 1.1 8.76.73 1.06 1.6 2.24 2.73 2.2 1.1-.05 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.07 2.65-2.13.84-1.22 1.18-2.41 1.2-2.47-.03-.01-2.3-.88-2.32-3.5ZM14.2 6.13c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.54 1.31-.56.65-1.05 1.69-.92 2.68.97.08 1.96-.49 2.56-1.23Z"
+            />
+          </svg>
+          {loading === 'apple' ? t('working') : t('apple')}
+        </Pressable>
+
+        <p className="text-center text-[12.5px] leading-relaxed text-ink-muted mt-4" data-testid="legal-note">
+          {t('legalAgreePrefix')}{' '}
+          <a href={legalUrl('terms')} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 text-ink">
+            {t('termsLink')}
+          </a>{' '}
+          {t('legalAnd')}{' '}
+          <a href={legalUrl('privacy')} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 text-ink">
+            {t('privacyLink')}
+          </a>
+          .
+        </p>
 
         <p className="text-center text-[15px] text-ink-muted mt-7">
           {isSignUp ? t('haveAccount') : t('newHere')}{' '}

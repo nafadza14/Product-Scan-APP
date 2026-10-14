@@ -90,7 +90,7 @@ const id = {
     tagline: "Yang kamu makan, terlihat di kulitmu.",
     cols: [
       { title: "Produk", links: [["Cara kerja", "#cara"], ["Pola", "#pola"], ["Harga", "#harga"], ["Buka app", APP_URL]] },
-      { title: "Bantuan", links: [["FAQ", "#faq"], ["Privasi", "#privasi"]] },
+      { title: "Bantuan", links: [["FAQ", "#faq"], ["Privasi", "#privasi"], ["Kebijakan Privasi", "/privacy"], ["Syarat dan Ketentuan", "/terms"]] },
     ],
     disclaimer: "Scanything memberi panduan kesehatan umum, bukan nasihat medis.",
   },
@@ -180,7 +180,7 @@ const en: typeof id = {
     tagline: "What you eat shows on your skin.",
     cols: [
       { title: "Product", links: [["How it works", "#cara"], ["Patterns", "#pola"], ["Pricing", "#harga"], ["Open the app", APP_URL]] },
-      { title: "Help", links: [["FAQ", "#faq"], ["Privacy", "#privasi"]] },
+      { title: "Help", links: [["FAQ", "#faq"], ["Privacy", "#privasi"], ["Privacy Policy", "/privacy"], ["Terms of Service", "/terms"]] },
     ],
     disclaimer: "Scanything gives general wellness guidance, not medical advice.",
   },

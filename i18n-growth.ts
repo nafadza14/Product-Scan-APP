@@ -2,6 +2,20 @@
 // English and Indonesian are complete. French, Arabic and Chinese fall back to English for these keys.
 
 export const growthEn = {
+  apple: 'Continue with Apple',
+  legalAgreePrefix: 'By continuing, you agree to the',
+  termsLink: 'Terms of Service',
+  legalAnd: 'and the',
+  privacyLink: 'Privacy Policy',
+  legalSection: 'Legal',
+  deleteAccount: 'Delete account',
+  deleteTitle: 'Delete your account?',
+  deleteBody: 'This permanently removes your account, health profile, scans, skin checks and photos, diary, plan and settings. It cannot be undone. A subscription bought in the App Store or Google Play must be cancelled there.',
+  deleteTypeHint: 'Type DELETE to confirm',
+  deleteWord: 'DELETE',
+  deleteConfirm: 'Delete permanently',
+  deleting: 'Deleting',
+  deleteError: 'Could not delete your account. Check your connection and try again, or email us.',
   tabToday: 'Today',
   tabProgress: 'Progress',
   tabForYou: 'For you',
@@ -240,6 +254,20 @@ export const growthEn = {
 export type GrowthKey = keyof typeof growthEn;
 
 export const growthId: Record<GrowthKey, string> = {
+  apple: 'Lanjut dengan Apple',
+  legalAgreePrefix: 'Dengan melanjutkan, kamu setuju dengan',
+  termsLink: 'Syarat dan Ketentuan',
+  legalAnd: 'serta',
+  privacyLink: 'Kebijakan Privasi',
+  legalSection: 'Legal',
+  deleteAccount: 'Hapus akun',
+  deleteTitle: 'Hapus akunmu?',
+  deleteBody: 'Ini menghapus permanen akun, profil kesehatan, hasil scan, cek kulit dan fotonya, jurnal, rencana, dan pengaturanmu. Tidak bisa dibatalkan. Langganan yang dibeli di App Store atau Google Play harus dibatalkan di sana.',
+  deleteTypeHint: 'Ketik HAPUS untuk konfirmasi',
+  deleteWord: 'HAPUS',
+  deleteConfirm: 'Hapus permanen',
+  deleting: 'Menghapus',
+  deleteError: 'Akun gagal dihapus. Periksa koneksimu dan coba lagi, atau kirim email ke kami.',
   tabToday: 'Hari ini',
   tabProgress: 'Progres',
   tabForYou: 'Untukmu',

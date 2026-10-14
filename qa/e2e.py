@@ -240,6 +240,19 @@ def supabase_route(route: Route):
             return route.fulfill(status=200, content_type="application/json", body=json.dumps([row] if row else []))
         state["cloud_settings"] = rows_from(req.post_data)[0]
         return route.fulfill(status=201, body="")
+    if "/rest/v1/rpc/delete_my_account" in url:
+        state["account_deleted"] = True
+        state["profile"] = None
+        state["scans"] = []
+        state["cloud_skin"], state["cloud_logs"], state["cloud_settings"] = {}, {}, None
+        return route.fulfill(status=204, body="")
+    if "/storage/v1/object/list/skin-photos" in url:
+        files = [{"name": p.split("/", 1)[1], "id": p} for p in state["cloud_photos"]]
+        return route.fulfill(status=200, content_type="application/json", body=json.dumps(files))
+    if url.rstrip("/").endswith("/storage/v1/object/skin-photos") and req.method == "DELETE":
+        for p in json.loads(req.post_data or "{}").get("prefixes", []):
+            state["cloud_photos"].pop(p, None)
+        return route.fulfill(status=200, content_type="application/json", body="[]")
     if "/storage/v1/object/skin-photos/" in url:
         path = url.split("/storage/v1/object/skin-photos/")[1].split("?")[0]
         if req.method in ("POST", "PUT"):
@@ -331,6 +344,10 @@ def main():
         def guest_scan_opens_auth():
             page.get_by_text("Sign in to start scanning").click()
             expect(page.get_by_role("heading", name="Create your account")).to_be_visible()
+            note = page.get_by_test_id("legal-note")
+            assert note.get_by_role("link", name="Terms of Service").get_attribute("href") == "https://www.scanything.online/terms?lang=en"
+            assert note.get_by_role("link", name="Privacy Policy").get_attribute("href") == "https://www.scanything.online/privacy?lang=en"
+            expect(page.get_by_role("button", name="Continue with Apple")).to_be_visible()
             shot(page, "02-auth-signup")
         check("Guest tapping scan opens sign up", guest_scan_opens_auth)
 
@@ -870,6 +887,30 @@ def main():
             page.get_by_role("button", name="Profile").last.click()
             expect(page.get_by_role("heading", name="Make every scan personal")).to_be_visible()
         check("Sign out returns to guest state", sign_out)
+
+        def delete_account():
+            page.get_by_role("button", name="Sign in").first.click()
+            page.get_by_label("Email").fill("sarah@example.com")
+            page.get_by_label("Password", exact=True).fill("secret123")
+            page.locator("form").get_by_role("button", name="Sign in").click()
+            expect(page.get_by_role("heading", name=re.compile("Hi Sarah"))).to_be_visible(timeout=6000)
+            assert state["cloud_photos"], "has a stored photo before deletion"
+            page.get_by_role("navigation").get_by_role("button", name="Profile").click()
+            page.wait_for_timeout(300)
+            scroll_main_bottom(page)
+            expect(page.get_by_role("button", name=re.compile("Privacy Policy"))).to_be_visible()
+            page.get_by_role("button", name=re.compile("Delete account")).click()
+            sheet = page.get_by_test_id("delete-account")
+            confirm = sheet.get_by_role("button", name="Delete permanently")
+            expect(confirm).to_be_disabled()
+            sheet.get_by_label("Type DELETE to confirm").fill("delete")
+            shot(page, "30-delete-account")
+            confirm.click()
+            expect(page.get_by_role("heading", name=re.compile("Hi there"))).to_be_visible(timeout=6000)
+            assert state.get("account_deleted") and not state["cloud_photos"] and state["profile"] is None
+            left = page.evaluate(f"Object.keys(localStorage).filter(k => k.startsWith('vitalSense_') && k.includes('{USER_ID}'))")
+            assert not left, left
+        check("Delete account removes cloud data, photos and device data, then signs out", delete_account)
 
         def no_em_dash_on_screen():
             texts = page.evaluate("document.body.innerText")

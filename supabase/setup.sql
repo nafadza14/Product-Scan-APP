@@ -86,3 +86,29 @@ create policy "vs_photos_update_own" on storage.objects for update
   using (bucket_id = 'skin-photos' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy "vs_photos_delete_own" on storage.objects for delete
   using (bucket_id = 'skin-photos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- 7. Account deletion from inside the app (App Store and Google Play requirement) -----------
+-- Deletes everything the signed-in person owns, then the auth user. Photos in storage are removed
+-- by the app first through the Storage API, because storage objects cannot be deleted with SQL.
+create or replace function public.delete_my_account()
+returns void
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  uid uuid := auth.uid();
+begin
+  if uid is null then
+    raise exception 'not signed in';
+  end if;
+  delete from public.scans where user_id = uid;
+  delete from public.skin_checks where user_id = uid;
+  delete from public.diary_logs where user_id = uid;
+  delete from public.user_settings where user_id = uid;
+  delete from public.profiles where id = uid;
+  delete from auth.users where id = uid;
+end;
+$$;
+revoke all on function public.delete_my_account() from public, anon;
+grant execute on function public.delete_my_account() to authenticated;
