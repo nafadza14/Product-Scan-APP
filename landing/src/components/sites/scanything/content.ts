@@ -22,9 +22,9 @@ const id = {
     lead: "Arahkan kamera ke apa pun yang kamu makan atau pakai. Hasilnya langsung disesuaikan dengan kondisi kulit dan tubuhmu.",
     tabs: [
       { key: "label", label: "Label", stat: "3 detik", statSub: "dari foto label ke skor personal", title: "Label makanan", body: "Skor 0 sampai 100 untukmu, bahan yang perlu diwaspadai, dan efeknya ke kulit." },
-      { key: "skincare", label: "Skincare", stat: "14", statSub: "bahan yang bisa kamu hindari otomatis", title: "Skincare", body: "Cocok atau tidak dengan jenis kulitmu, plus peringatan dari daftar hindarimu." },
       { key: "selfie", label: "Selfie", stat: "6 zona", statSub: "wajah dianalisis di setiap cek", title: "Cek kulit", body: "Jerawat, noda, pori, kemerahan, dan kelembapan. Lengkap dengan rutinitas pagi dan malam." },
       { key: "meal", label: "Makanan", stat: "1 foto", statSub: "cukup untuk mencatat satu menu", title: "Foto makanan", body: "Gula, susu, gorengan, omega-3. Semua tercatat untuk melihat polanya di kulitmu." },
+      { key: "plan", label: "Rencana", stat: "13", statSub: "pertanyaan singkat, satu rencana personal", title: "Rencana kulit", body: "Makanan yang dikurangi dan diperbanyak, plus rutinitas pagi dan malam sesuai kondisimu." },
     ],
   },
   skin: {
@@ -116,9 +116,9 @@ const en: typeof id = {
     lead: "Point your camera at anything you eat or apply. Results are tuned to your skin and your body.",
     tabs: [
       { key: "label", label: "Label", stat: "3 sec", statSub: "from label photo to personal score", title: "Food labels", body: "A 0 to 100 score for you, ingredients to watch, and how it may affect your skin." },
-      { key: "skincare", label: "Skincare", stat: "14", statSub: "ingredients you can avoid automatically", title: "Skincare", body: "Whether it fits your skin type, plus warnings from your avoid list." },
       { key: "selfie", label: "Selfie", stat: "6 zones", statSub: "of your face read in every check", title: "Skin check", body: "Breakouts, dark spots, pores, redness and hydration, with a morning and evening routine." },
       { key: "meal", label: "Meals", stat: "1 photo", statSub: "is all it takes to log a meal", title: "Meal photos", body: "Sugar, dairy, fried food, omega-3. Logged so you can see the pattern on your skin." },
+      { key: "plan", label: "Plan", stat: "13", statSub: "quick questions, one personal plan", title: "Skin plan", body: "Foods to cut back and add, plus a morning and evening routine that fits you." },
     ],
   },
   skin: {

@@ -1,32 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useInView } from "framer-motion";
 import { APP_URL, COPY, type Lang } from "./content";
-import { LabelScreen, MealScreen, PatternScreen, PhoneFrame, SelfieScreen, SkincareScreen, TodayScreen } from "./Phones";
-
-/** Adds .is-in to [data-reveal] elements once they scroll into view. */
-function useReveal(dep: unknown) {
-  useEffect(() => {
-    const els = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]:not(.is-in)"));
-    if (!("IntersectionObserver" in window)) {
-      els.forEach((e) => e.classList.add("is-in"));
-      return;
-    }
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((en) => {
-          if (en.isIntersecting) {
-            en.target.classList.add("is-in");
-            io.unobserve(en.target);
-          }
-        });
-      },
-      { rootMargin: "0px 0px -12% 0px", threshold: 0.05 }
-    );
-    els.forEach((e) => io.observe(e));
-    return () => io.disconnect();
-  }, [dep]);
-}
+import { AppClip, PhoneFrame, type Clip } from "./Phones";
+import { IOS_EASE, RISE_EASE, reveal, rise, sheetTransition, softSpring, stagger } from "./motion";
 
 function AppleIcon() {
   return (
@@ -60,6 +38,16 @@ function Logo({ dark = false }: { dark?: boolean }) {
   );
 }
 
+/** Pill link with the app's press feedback (scale 0.96 on a soft spring). */
+function Pill({ href, className = "", children }: { href: string; className?: string; children: React.ReactNode }) {
+  return (
+    <motion.a href={href} className={`pill ${className}`} whileTap={{ scale: 0.96 }} transition={softSpring}>
+      {children}
+    </motion.a>
+  );
+}
+
+const TAB_CLIPS: Clip[] = ["scan", "skin", "meal", "plan"];
 const FEATURE_ICONS: Record<string, string> = { plan: "✨", avoid: "🚫", diary: "📓", progress: "📸" };
 
 export function Landing() {
@@ -71,8 +59,7 @@ export function Landing() {
   const [scrolled, setScrolled] = useState(false);
   const c = COPY[lang];
   const tabsRef = useRef<HTMLDivElement>(null);
-
-  useReveal(lang);
+  const tabsVisible = useInView(tabsRef, { amount: 0.4 });
 
   useEffect(() => {
     try {
@@ -99,25 +86,18 @@ export function Landing() {
     return () => window.removeEventListener("scroll", on);
   }, []);
 
-  // Tabs advance by themselves while the section is visible, until the visitor picks one.
+  // Tabs advance while visible, timed to each recording, until the visitor picks one.
   useEffect(() => {
-    if (!auto) return;
-    const el = tabsRef.current;
-    let visible = false;
-    const io = new IntersectionObserver((e) => (visible = e[0].isIntersecting), { threshold: 0.4 });
-    if (el) io.observe(el);
-    const id = window.setInterval(() => visible && setTab((x) => (x + 1) % 4), 4200);
-    return () => {
-      io.disconnect();
-      window.clearInterval(id);
-    };
-  }, [auto]);
+    if (!auto || !tabsVisible) return;
+    const durations = [10000, 10500, 6400, 9000];
+    const id = window.setTimeout(() => setTab((x) => (x + 1) % 4), durations[tab]);
+    return () => window.clearTimeout(id);
+  }, [auto, tabsVisible, tab]);
 
   useEffect(() => {
     document.body.style.overflow = menu ? "hidden" : "";
   }, [menu]);
 
-  const screens = [<LabelScreen key="l" lang={lang} />, <SkincareScreen key="s" lang={lang} />, <SelfieScreen key="f" lang={lang} />, <MealScreen key="m" lang={lang} />];
   const navLinks: [string, string][] = [
     [c.nav.how, "#cara"],
     [c.nav.skin, "#kulit"],
@@ -126,6 +106,7 @@ export function Landing() {
     [c.nav.pricing, "#harga"],
     [c.nav.faq, "#faq"],
   ];
+  const durations = [10000, 10500, 6400, 9000];
 
   return (
     <>
@@ -151,48 +132,50 @@ export function Landing() {
               </svg>
               {lang === "id" ? "EN" : "ID"}
             </button>
-            <a href={APP_URL} className="pill pill--sm">
+            <Pill href={APP_URL} className="pill--sm">
               {c.cta}
-            </a>
+            </Pill>
             <button className={`burger ${menu ? "is-open" : ""}`} onClick={() => setMenu(!menu)} aria-expanded={menu} aria-label={menu ? c.close : c.menu}>
               <i />
               <i />
             </button>
           </div>
         </div>
-        <div className={`sheet ${menu ? "is-open" : ""}`} aria-hidden={!menu}>
-          <nav className="wrap sheet__nav">
-            {navLinks.map(([l, h], i) => (
-              <a key={h} href={h} onClick={() => setMenu(false)} style={{ transitionDelay: menu ? `${0.04 * i + 0.05}s` : "0s" }} tabIndex={menu ? 0 : -1}>
-                {l}
-              </a>
-            ))}
-            <a href={APP_URL} className="pill" tabIndex={menu ? 0 : -1}>
-              {c.cta}
-            </a>
-          </nav>
-        </div>
+        <AnimatePresence>
+          {menu && (
+            <motion.div className="sheet" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.3, ease: IOS_EASE }}>
+              <motion.nav className="wrap sheet__nav" variants={stagger} initial="hidden" animate="show">
+                {navLinks.map(([l, h]) => (
+                  <motion.a key={h} href={h} onClick={() => setMenu(false)} variants={rise}>
+                    {l}
+                  </motion.a>
+                ))}
+                <motion.div variants={rise}>
+                  <Pill href={APP_URL} className="pill--lg">
+                    {c.cta}
+                  </Pill>
+                </motion.div>
+              </motion.nav>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
       <main id="main">
-        {/* Hero */}
+        {/* Hero: same entrance as the app's home screen */}
         <section id="top" className="hero surface-white">
-          <div className="wrap hero__inner">
-            <h1 className="hero__title">
-              <span className="hero-in" style={{ animationDelay: "0.05s" }}>
-                {c.hero.title[0]}
-              </span>
-              <span className="hero-in hero__accent" style={{ animationDelay: "0.15s" }}>
-                {c.hero.title[1]}
-              </span>
-            </h1>
-            <p className="lead hero__lead hero-in" style={{ animationDelay: "0.25s" }}>
+          <motion.div className="wrap hero__inner" variants={stagger} initial="hidden" animate="show" key={`hero-${lang}`}>
+            <motion.h1 className="hero__title" variants={rise}>
+              <span>{c.hero.title[0]}</span>
+              <span className="hero__accent">{c.hero.title[1]}</span>
+            </motion.h1>
+            <motion.p className="lead hero__lead" variants={rise}>
               {c.hero.lead}
-            </p>
-            <div className="hero__ctas hero-in" style={{ animationDelay: "0.35s" }}>
-              <a href={APP_URL} className="pill pill--lg">
+            </motion.p>
+            <motion.div className="hero__ctas" variants={rise}>
+              <Pill href={APP_URL} className="pill--lg">
                 {c.hero.primary}
-              </a>
+              </Pill>
               <div className="hero__stores">
                 <span className="store" aria-disabled="true">
                   <AppleIcon />
@@ -209,71 +192,89 @@ export function Landing() {
                   </span>
                 </span>
               </div>
-            </div>
-          </div>
-          <div className="hero__stage hero-stage">
+            </motion.div>
+          </motion.div>
+          <motion.div className="hero__stage" initial={{ opacity: 0, y: 60 }} animate={{ opacity: 1, y: 0 }} transition={{ ...sheetTransition, delay: 0.35 }}>
             <div className="hero__orb" aria-hidden />
-            <div className="hero__chips" aria-hidden>
-              <span className="chip chip--a">🥣 46</span>
-              <span className="chip chip--b">🧴 {lang === "id" ? "Cocok" : "Good fit"}</span>
-              <span className="chip chip--c">🥗 Omega-3</span>
-            </div>
             <PhoneFrame className="hero__phone">
-              <div className="toast">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/sites/scanything/icon.svg" alt="" width={22} height={22} />
-                <span>
-                  <b>{c.hero.toastTitle}</b>
-                  <span>{c.hero.toastBody}</span>
-                </span>
-              </div>
-              <TodayScreen lang={lang} />
+              <AppClip clip="today" lang={lang} eager label={c.hero.title.join(" ")} />
             </PhoneFrame>
-          </div>
+          </motion.div>
         </section>
 
-        {/* How it works */}
+        {/* How it works: segmented control and clips, like the app's Segmented + sheet */}
         <section id="cara" className="section surface-panel">
           <div className="wrap">
             <header className="section__head">
-              <h2 className="h2" data-reveal>
+              <motion.h2 className="h2" {...reveal(0)}>
                 {c.how.title}
-              </h2>
-              <p className="lead" data-reveal>
+              </motion.h2>
+              <motion.p className="lead" {...reveal(1)}>
                 {c.how.lead}
-              </p>
+              </motion.p>
             </header>
             <div className="tabs" ref={tabsRef}>
-              <div className="seg" role="tablist" aria-label={c.nav.how}>
-                <span className="seg__bubble" style={{ transform: `translateX(${tab * 100}%)` }} />
-                {c.how.tabs.map((tb, i) => (
-                  <button
-                    key={tb.key}
-                    role="tab"
-                    aria-selected={tab === i}
-                    className={tab === i ? "is-on" : ""}
-                    onClick={() => {
-                      setAuto(false);
-                      setTab(i);
-                    }}
-                  >
-                    {tb.label}
-                    {auto && tab === i && <span className="seg__progress" key={`p${i}`} />}
-                  </button>
-                ))}
-              </div>
+              <motion.div className="seg" role="tablist" aria-label={c.nav.how} {...reveal(2)}>
+                {c.how.tabs.map((tb, i) => {
+                  const on = tab === i;
+                  return (
+                    <button
+                      key={tb.key}
+                      role="tab"
+                      aria-selected={on}
+                      className={on ? "is-on" : ""}
+                      onClick={() => {
+                        setAuto(false);
+                        setTab(i);
+                      }}
+                    >
+                      {on && <motion.span layoutId="seg-bubble" className="seg__bubble" transition={softSpring} />}
+                      <span className="seg__label">{tb.label}</span>
+                      {on && auto && tabsVisible && (
+                        <motion.span
+                          key={`p${i}`}
+                          className="seg__progress"
+                          initial={{ scaleX: 0 }}
+                          animate={{ scaleX: 1 }}
+                          transition={{ duration: durations[i] / 1000, ease: "linear" }}
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </motion.div>
               <div className="tabs__body">
-                <PhoneFrame className="tabs__phone">
-                  <div key={`${tab}-${lang}`} className="swap">
-                    {screens[tab]}
-                  </div>
-                </PhoneFrame>
-                <div key={`t${tab}-${lang}`} className="tabs__copy swap">
-                  <span className="stat">{c.how.tabs[tab].stat}</span>
-                  <span className="stat__sub">{c.how.tabs[tab].statSub}</span>
-                  <h3>{c.how.tabs[tab].title}</h3>
-                  <p>{c.how.tabs[tab].body}</p>
-                </div>
+                <motion.div {...reveal(3)}>
+                  <PhoneFrame className="tabs__phone">
+                    <AnimatePresence mode="popLayout" initial={false}>
+                      <motion.div
+                        key={`${TAB_CLIPS[tab]}-${lang}`}
+                        className="phone__layer"
+                        initial={{ y: "100%" }}
+                        animate={{ y: 0 }}
+                        exit={{ scale: 0.92, opacity: 0.4, filter: "brightness(0.9)" }}
+                        transition={sheetTransition}
+                      >
+                        <AppClip clip={TAB_CLIPS[tab]} lang={lang} label={c.how.tabs[tab].title} />
+                      </motion.div>
+                    </AnimatePresence>
+                  </PhoneFrame>
+                </motion.div>
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={`t${tab}-${lang}`}
+                    className="tabs__copy"
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.35, ease: RISE_EASE }}
+                  >
+                    <span className="stat">{c.how.tabs[tab].stat}</span>
+                    <span className="stat__sub">{c.how.tabs[tab].statSub}</span>
+                    <h3>{c.how.tabs[tab].title}</h3>
+                    <p>{c.how.tabs[tab].body}</p>
+                  </motion.div>
+                </AnimatePresence>
               </div>
             </div>
           </div>
@@ -283,60 +284,60 @@ export function Landing() {
         <section id="kulit" className="section surface-white">
           <div className="wrap split">
             <div>
-              <span className="eyebrow" data-reveal>
+              <motion.span className="eyebrow" {...reveal(0)}>
                 {c.skin.eyebrow}
-              </span>
-              <h2 className="h2" data-reveal>
+              </motion.span>
+              <motion.h2 className="h2" {...reveal(1)}>
                 {c.skin.title}
-              </h2>
-              <p className="lead" data-reveal>
+              </motion.h2>
+              <motion.p className="lead" {...reveal(2)}>
                 {c.skin.lead}
-              </p>
+              </motion.p>
               <ul className="checks">
                 {c.skin.points.map((p, i) => (
-                  <li key={p} data-reveal style={{ transitionDelay: `${i * 0.08}s` }}>
+                  <motion.li key={p} {...reveal(3 + i)}>
                     <span className="checks__dot">✓</span>
                     {p}
-                  </li>
+                  </motion.li>
                 ))}
               </ul>
             </div>
-            <div className="split__visual" data-reveal>
+            <motion.div className="split__visual" {...reveal(2)}>
               <PhoneFrame>
-                <LabelScreen lang={lang} />
+                <AppClip clip="scan" lang={lang} still label={c.skin.title} />
               </PhoneFrame>
-            </div>
+            </motion.div>
           </div>
         </section>
 
-        {/* Patterns, dark */}
+        {/* Patterns */}
         <section id="pola" className="section surface-dark">
           <div className="wrap split">
             <div>
-              <span className="eyebrow eyebrow--dark" data-reveal>
+              <motion.span className="eyebrow" {...reveal(0)}>
                 {c.patterns.eyebrow}
-              </span>
-              <h2 className="h2" data-reveal>
+              </motion.span>
+              <motion.h2 className="h2" {...reveal(1)}>
                 {c.patterns.title}
-              </h2>
-              <p className="lead lead--dark" data-reveal>
+              </motion.h2>
+              <motion.p className="lead lead--dark" {...reveal(2)}>
                 {c.patterns.lead}
-              </p>
+              </motion.p>
               <ul className="insights">
                 {c.patterns.insights.map((i, k) => (
-                  <li key={i.text} data-reveal style={{ transitionDelay: `${k * 0.1}s` }}>
+                  <motion.li key={i.text} {...reveal(3 + k)}>
                     <span className={`insights__delta ${i.delta.startsWith("+") ? "up" : "down"}`}>{i.delta}</span>
                     {i.text}
-                  </li>
+                  </motion.li>
                 ))}
               </ul>
               <p className="fine fine--dark">{c.patterns.note}</p>
             </div>
-            <div className="split__visual" data-reveal>
-              <PhoneFrame className="phone--dark">
-                <PatternScreen lang={lang} />
+            <motion.div className="split__visual" {...reveal(2)}>
+              <PhoneFrame>
+                <AppClip clip="progress" lang={lang} label={c.patterns.title} />
               </PhoneFrame>
-            </div>
+            </motion.div>
           </div>
           <div className="flow" aria-hidden>
             <div className="flow__track">
@@ -353,17 +354,17 @@ export function Landing() {
         <section className="section surface-panel">
           <div className="wrap">
             <header className="section__head">
-              <h2 className="h2" data-reveal>
+              <motion.h2 className="h2" {...reveal(0)}>
                 {c.features.title}
-              </h2>
+              </motion.h2>
             </header>
             <div className="cards">
               {c.features.items.map((f, i) => (
-                <article key={f.key} className="card" data-reveal style={{ transitionDelay: `${(i % 2) * 0.08}s` }}>
+                <motion.article key={f.key} className="card" {...reveal(i % 2)} whileTap={{ scale: 0.98 }}>
                   <span className="card__icon">{FEATURE_ICONS[f.key]}</span>
                   <h3>{f.title}</h3>
                   <p>{f.body}</p>
-                </article>
+                </motion.article>
               ))}
             </div>
           </div>
@@ -373,39 +374,39 @@ export function Landing() {
         <section id="privasi" className="section surface-white">
           <div className="wrap">
             <header className="section__head">
-              <h2 className="h2" data-reveal>
+              <motion.h2 className="h2" {...reveal(0)}>
                 {c.privacy.title}
-              </h2>
-              <p className="lead" data-reveal>
+              </motion.h2>
+              <motion.p className="lead" {...reveal(1)}>
                 {c.privacy.lead}
-              </p>
+              </motion.p>
             </header>
-            <div className="cards cards--plain">
+            <div className="cards">
               {c.privacy.cards.map((p, i) => (
-                <article key={p.title} className="card card--line" data-reveal style={{ transitionDelay: `${(i % 2) * 0.08}s` }}>
+                <motion.article key={p.title} className="card card--mist" {...reveal(i % 2)}>
                   <span className="card__lock">🔒</span>
                   <h3>{p.title}</h3>
                   <p>{p.body}</p>
-                </article>
+                </motion.article>
               ))}
             </div>
           </div>
         </section>
 
-        {/* Pricing */}
+        {/* Pricing: mirrors the app's paywall options */}
         <section id="harga" className="section surface-panel">
           <div className="wrap">
             <header className="section__head">
-              <h2 className="h2" data-reveal>
+              <motion.h2 className="h2" {...reveal(0)}>
                 {c.pricing.title}
-              </h2>
-              <p className="lead" data-reveal>
+              </motion.h2>
+              <motion.p className="lead" {...reveal(1)}>
                 {c.pricing.lead}
-              </p>
+              </motion.p>
             </header>
             <div className="prices">
               {[c.pricing.free, c.pricing.premium].map((p, i) => (
-                <article key={p.name} className={`price ${i === 1 ? "price--hi" : ""}`} data-reveal style={{ transitionDelay: `${i * 0.1}s` }}>
+                <motion.article key={p.name} className={`price ${i === 1 ? "price--hi" : ""}`} {...reveal(i)}>
                   {"badge" in p && <span className="price__badge">{(p as typeof c.pricing.premium).badge}</span>}
                   <h3>{p.name}</h3>
                   <p className="price__amt">
@@ -416,51 +417,76 @@ export function Landing() {
                       <li key={it}>{it}</li>
                     ))}
                   </ul>
-                  <a href={APP_URL} className={`pill ${i === 1 ? "pill--peach" : "pill--ghost"}`}>
+                  <Pill href={APP_URL} className={i === 1 ? "pill--peach" : "pill--ghost"}>
                     {p.cta}
-                  </a>
-                </article>
+                  </Pill>
+                </motion.article>
               ))}
             </div>
             <p className="fine center">{c.pricing.note}</p>
           </div>
         </section>
 
-        {/* Closing */}
+        {/* Closing: the app's splash pulse */}
         <section className="closing surface-white">
           <div className="wrap center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/sites/scanything/icon.svg" alt="" width={96} height={96} className="closing__logo" data-reveal />
-            <h2 className="h2" data-reveal>
+            <motion.img
+              src="/sites/scanything/icon.svg"
+              alt=""
+              width={96}
+              height={96}
+              className="closing__logo"
+              initial={{ opacity: 0, scale: 0.9 }}
+              whileInView={{ opacity: 1, scale: [1, 1.05, 1] }}
+              viewport={{ once: false, amount: 0.6 }}
+              transition={{ scale: { duration: 1.4, repeat: Infinity, ease: "easeInOut" }, opacity: { duration: 0.4 } }}
+            />
+            <motion.h2 className="h2" {...reveal(1)}>
               {c.closing.title}
-            </h2>
-            <p className="lead" data-reveal>
+            </motion.h2>
+            <motion.p className="lead" {...reveal(2)}>
               {c.closing.lead}
-            </p>
-            <a href={APP_URL} className="pill pill--lg closing__cta" data-reveal>
-              {c.closing.cta}
-            </a>
+            </motion.p>
+            <motion.div {...reveal(3)} className="closing__cta">
+              <Pill href={APP_URL} className="pill--lg">
+                {c.closing.cta}
+              </Pill>
+            </motion.div>
           </div>
         </section>
 
-        {/* FAQ */}
+        {/* FAQ: expands like the app's full ingredient list */}
         <section id="faq" className="section surface-dark">
           <div className="wrap">
-            <h2 className="h2" data-reveal>
+            <motion.h2 className="h2" {...reveal(0)}>
               {c.faq.title}
-            </h2>
+            </motion.h2>
             <div className="faq">
               {c.faq.items.map((f, i) => {
                 const open = faq === i;
                 return (
-                  <div key={f.q} className={`faq__item ${open ? "is-open" : ""}`}>
+                  <div key={f.q} className="faq__item">
                     <button className="faq__q" aria-expanded={open} onClick={() => setFaq(open ? null : i)}>
                       {f.q}
-                      <span className="faq__plus" aria-hidden />
+                      <motion.span className="faq__chev" animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.3, ease: IOS_EASE }} aria-hidden>
+                        <svg viewBox="0 0 24 24" width="20" height="20">
+                          <path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </motion.span>
                     </button>
-                    <div className="faq__a">
-                      <p>{f.a}</p>
-                    </div>
+                    <AnimatePresence initial={false}>
+                      {open && (
+                        <motion.div
+                          className="faq__a"
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.3, ease: IOS_EASE }}
+                        >
+                          <p>{f.a}</p>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 );
               })}
