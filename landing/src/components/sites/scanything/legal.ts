@@ -1,13 +1,14 @@
 import type { Lang } from "./content";
 
-/**
- * Operator details used throughout the legal pages.
- * Replace `entity` with the registered legal name (for example the PT) and `email` with the support inbox.
- */
+/** Operator details used throughout the legal pages. */
 export const LEGAL = {
-  entity: "Scanything",
+  /** Registered company (the legal entity). */
+  entity: "PT. Bantu Indonesia Technology",
+  /** Company brand that Scanything sits under. */
+  brand: "Zieara Technology",
   email: "hello@scanything.online",
   country: "Indonesia",
+  address: "Omah Dongeng Kalasan, Somodaran, Purwomartani, Kalasan, Sleman, Daerah Istimewa Yogyakarta, Indonesia",
 } as const;
 
 /** A plain string is a paragraph, a string array is a bullet list. Inline links use [label](/path). */
@@ -26,7 +27,9 @@ export type LegalUi = {
   docs: Record<LegalKind, string>;
 };
 
-const { entity, email, country } = LEGAL;
+const { entity, brand, email, address } = LEGAL;
+/** "Zieara Technology (PT. Bantu Indonesia Technology)" */
+const operator = `${brand} (${entity})`;
 
 /* ------------------------------------------------------------------ */
 /* Indonesian                                                          */
@@ -35,7 +38,7 @@ const { entity, email, country } = LEGAL;
 const uiId: LegalUi = {
   eyebrow: "Legal",
   updatedLabel: "Terakhir diperbarui",
-  updatedDate: "14 Oktober 2026",
+  updatedDate: "15 Oktober 2026",
   contents: "Isi",
   seeAlso: "Baca juga",
   backHome: "Kembali ke beranda",
@@ -45,7 +48,7 @@ const uiId: LegalUi = {
 const privacyId: LegalDoc = {
   title: "Kebijakan Privasi",
   intro: [
-    `Kebijakan ini menjelaskan data pribadi apa yang dikumpulkan ${entity} ("kami") saat kamu memakai Scanything, untuk apa data itu dipakai, siapa yang membantu kami memprosesnya, dan pilihan yang kamu punya. Kami menulisnya dengan bahasa sederhana. Kalau ada yang kurang jelas, kirim email ke ${email}.`,
+    `Kebijakan ini menjelaskan data pribadi apa yang dikumpulkan ${operator} ("kami") saat kamu memakai Scanything, untuk apa data itu dipakai, siapa yang membantu kami memprosesnya, dan pilihan yang kamu punya. Kami menulisnya dengan bahasa sederhana. Kalau ada yang kurang jelas, kirim email ke ${email}.`,
   ],
   sections: [
     {
@@ -63,7 +66,8 @@ const privacyId: LegalDoc = {
     {
       heading: "Siapa kami",
       body: [
-        `Scanything dijalankan oleh ${entity}, berkedudukan di ${country}. Layanan ini mencakup web app di app.scanything.online serta app Android dan iOS kami (bersama-sama disebut "Scanything" atau "layanan").`,
+        `Scanything adalah produk ${brand}, yang berada di bawah ${entity}, perseroan terbatas yang didirikan berdasarkan hukum Republik Indonesia. Layanan ini mencakup web app di app.scanything.online serta app Android dan iOS kami (bersama-sama disebut "Scanything" atau "layanan").`,
+        `Kantor pusat: ${address}.`,
         `${entity} bertanggung jawab atas data pribadimu berdasarkan kebijakan ini, sebagai pengendali data pribadi.`,
       ],
     },
@@ -192,7 +196,7 @@ const privacyId: LegalDoc = {
     },
     {
       heading: "Kontak",
-      body: [`Pertanyaan, permintaan, atau keluhan tentang datamu: ${email}. ${entity}, ${country}.`],
+      body: [`Pertanyaan, permintaan, atau keluhan tentang datamu: ${email}.`, `${operator}. Kantor pusat: ${address}.`],
     },
   ],
 };
@@ -200,7 +204,7 @@ const privacyId: LegalDoc = {
 const termsId: LegalDoc = {
   title: "Syarat dan Ketentuan",
   intro: [
-    `Syarat ini adalah perjanjian antara kamu dan ${entity} untuk memakai Scanything: web app di app.scanything.online serta app Android dan iOS kami. Dengan membuat akun atau memakai layanan, kamu menyetujuinya. Mohon baca dengan saksama, terutama bagian kesehatan.`,
+    `Syarat ini adalah perjanjian antara kamu dan ${entity} (${brand}, "kami") untuk memakai Scanything: web app di app.scanything.online serta app Android dan iOS kami. Dengan membuat akun atau memakai layanan, kamu menyetujuinya. Mohon baca dengan saksama, terutama bagian kesehatan.`,
   ],
   sections: [
     {
@@ -333,7 +337,7 @@ const termsId: LegalDoc = {
     },
     {
       heading: "Kontak",
-      body: [`Pertanyaan tentang syarat ini: ${email}. ${entity}, ${country}.`],
+      body: [`Pertanyaan tentang syarat ini: ${email}.`, `${operator}. Kantor pusat: ${address}.`],
     },
   ],
 };
@@ -345,7 +349,7 @@ const termsId: LegalDoc = {
 const uiEn: LegalUi = {
   eyebrow: "Legal",
   updatedLabel: "Last updated",
-  updatedDate: "14 October 2026",
+  updatedDate: "15 October 2026",
   contents: "Contents",
   seeAlso: "Read next",
   backHome: "Back to home",
@@ -355,7 +359,7 @@ const uiEn: LegalUi = {
 const privacyEn: LegalDoc = {
   title: "Privacy Policy",
   intro: [
-    `This policy explains what personal data ${entity} ("we") collects when you use Scanything, why we use it, who helps us process it and the choices you have. We wrote it in plain language. If anything is unclear, email us at ${email}.`,
+    `This policy explains what personal data ${operator} ("we") collects when you use Scanything, why we use it, who helps us process it and the choices you have. We wrote it in plain language. If anything is unclear, email us at ${email}.`,
   ],
   sections: [
     {
@@ -373,7 +377,8 @@ const privacyEn: LegalDoc = {
     {
       heading: "Who we are",
       body: [
-        `Scanything is run by ${entity}, based in ${country}. The service includes the web app at app.scanything.online and our Android and iOS apps (together, "Scanything" or "the service").`,
+        `Scanything is a product of ${brand}, which sits under ${entity}, a limited liability company established under the laws of the Republic of Indonesia. The service includes the web app at app.scanything.online and our Android and iOS apps (together, "Scanything" or "the service").`,
+        `Head office: ${address}.`,
         `${entity} is responsible for your personal data under this policy, as the data controller.`,
       ],
     },
@@ -502,7 +507,7 @@ const privacyEn: LegalDoc = {
     },
     {
       heading: "Contact",
-      body: [`Questions, requests or complaints about your data: ${email}. ${entity}, ${country}.`],
+      body: [`Questions, requests or complaints about your data: ${email}.`, `${operator}. Head office: ${address}.`],
     },
   ],
 };
@@ -510,7 +515,7 @@ const privacyEn: LegalDoc = {
 const termsEn: LegalDoc = {
   title: "Terms of Service",
   intro: [
-    `These terms are the agreement between you and ${entity} for using Scanything: the web app at app.scanything.online and our Android and iOS apps. By creating an account or using the service, you agree to them. Please read them carefully, especially the health section.`,
+    `These terms are the agreement between you and ${entity} (${brand}, "we") for using Scanything: the web app at app.scanything.online and our Android and iOS apps. By creating an account or using the service, you agree to them. Please read them carefully, especially the health section.`,
   ],
   sections: [
     {
@@ -643,7 +648,7 @@ const termsEn: LegalDoc = {
     },
     {
       heading: "Contact",
-      body: [`Questions about these terms: ${email}. ${entity}, ${country}.`],
+      body: [`Questions about these terms: ${email}.`, `${operator}. Head office: ${address}.`],
     },
   ],
 };

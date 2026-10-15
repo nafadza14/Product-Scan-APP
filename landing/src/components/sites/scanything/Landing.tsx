@@ -512,7 +512,7 @@ export function Landing() {
             ))}
           </div>
           <p className="fine fine--dark">{c.footer.disclaimer}</p>
-          <p className="fine fine--dark">© {new Date().getFullYear()} Scanything</p>
+          <p className="fine fine--dark">© {new Date().getFullYear()} Scanything · Zieara Technology (PT. Bantu Indonesia Technology)</p>
         </div>
       </footer>
     </>

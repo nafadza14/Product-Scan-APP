@@ -226,7 +226,7 @@ export function LegalPage({ kind }: { kind: LegalKind }) {
             ))}
           </div>
           <p className="fine fine--dark">{c.footer.disclaimer}</p>
-          <p className="fine fine--dark">© {new Date().getFullYear()} {LEGAL.entity}</p>
+          <p className="fine fine--dark">© {new Date().getFullYear()} {LEGAL.brand} · {LEGAL.entity}</p>
         </div>
       </footer>
     </>
